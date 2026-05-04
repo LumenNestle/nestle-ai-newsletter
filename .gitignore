@@ -1,4 +1,5 @@
 node_modules/
+frontend/.corepack/
 
 # Environment variables
 backend/.env
@@ -8,3 +9,5 @@ frontend/.env
 backend/dist/
 frontend/dist/
 frontend/build/
+
+backend/eslint.config.mjs

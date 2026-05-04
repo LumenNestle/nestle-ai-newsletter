@@ -8,17 +8,10 @@ datasource db {
 
 model areas {
   id          String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  name        String        @unique
+  name        area_name     @unique(map: "areas_name_unique")
   newsletters newsletters[]
   templates   templates[]
   users       users[]
-}
-
-model asset_types {
-  id     String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  code   String   @unique
-  name   String
-  assets assets[]
 }
 
 model assets {
@@ -27,12 +20,9 @@ model assets {
   url             String
   description     String?
   created_at      DateTime          @default(now()) @db.Timestamptz(6)
-  type_id         String            @db.Uuid
-  asset_types     asset_types       @relation(fields: [type_id], references: [id], onUpdate: NoAction)
+  type            asset_type
   assets_block    assets_block[]
   brandkit_assets brandkit_assets[]
-
-  @@index([type_id])
 }
 
 model assets_block {
@@ -47,25 +37,15 @@ model assets_block {
 }
 
 model block_content {
-  id                  String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  type_id             String              @db.Uuid
-  content             String?
-  display_order       Int?
-  must_fill           Boolean             @default(false)
-  assets_block        assets_block[]
-  block_content_types block_content_types @relation(fields: [type_id], references: [id], onUpdate: NoAction)
-  commentary          commentary[]
-  hyperlinks          hyperlinks[]
-  newsletter_blocks   newsletter_blocks[]
-
-  @@index([type_id])
-}
-
-model block_content_types {
-  id            String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  code          String          @unique
-  name          String
-  block_content block_content[]
+  id                String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  content           String?
+  display_order     Int?
+  must_fill         Boolean             @default(false)
+  type              block_content_type
+  assets_block      assets_block[]
+  commentary        commentary[]
+  hyperlinks        hyperlinks[]
+  newsletter_blocks newsletter_blocks[]
 }
 
 model brand_kit {
@@ -159,13 +139,6 @@ model hyperlinks {
   @@index([block_content_id])
 }
 
-model languages {
-  id          String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  code        String        @unique
-  name        String
-  newsletters newsletters[]
-}
-
 model newsletter_blocks {
   newsletter_id    String        @db.Uuid
   block_content_id String        @db.Uuid
@@ -193,13 +166,6 @@ model newsletter_exports {
   @@index([newsletter_id])
 }
 
-model newsletter_formats {
-  id          String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  code        String        @unique
-  name        String
-  newsletters newsletters[]
-}
-
 model newsletter_state_log {
   id                  String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   newsletter_id       String      @db.Uuid
@@ -215,21 +181,11 @@ model newsletter_state_log {
   @@index([reviewed_by_user_id])
 }
 
-model newsletter_states {
-  id          String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  code        String        @unique
-  name        String
-  newsletters newsletters[]
-}
-
 model newsletters {
   id                                           String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   title                                        String
-  state_id                                     String                 @db.Uuid
   area_id                                      String?                @db.Uuid
   theme_tag                                    String?
-  language_id                                  String?                @db.Uuid
-  format_id                                    String?                @db.Uuid
   created_at                                   DateTime               @default(now()) @db.Timestamptz(6)
   updated_at                                   DateTime               @default(now()) @db.Timestamptz(6)
   publish_date                                 DateTime?              @db.Timestamptz(6)
@@ -237,6 +193,9 @@ model newsletters {
   template_id                                  String?                @db.Uuid
   approved_by_user_id                          String?                @db.Uuid
   created_by_user_id                           String?                @db.Uuid
+  state                                        newsletter_state       @default(DRAFT)
+  language                                     newsletter_language    @default(SPA)
+  format                                       newsletter_format      @default(PORTRAIT)
   newsletter_blocks                            newsletter_blocks[]
   newsletter_exports                           newsletter_exports[]
   newsletter_state_log                         newsletter_state_log[]
@@ -244,18 +203,12 @@ model newsletters {
   areas                                        areas?                 @relation(fields: [area_id], references: [id], onUpdate: NoAction)
   brand_kit                                    brand_kit?             @relation(fields: [brand_kit_id], references: [id], onUpdate: NoAction)
   users_newsletters_created_by_user_idTousers  users?                 @relation("newsletters_created_by_user_idTousers", fields: [created_by_user_id], references: [id], onUpdate: NoAction)
-  newsletter_formats                           newsletter_formats?    @relation(fields: [format_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
-  languages                                    languages?             @relation(fields: [language_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
-  newsletter_states                            newsletter_states      @relation(fields: [state_id], references: [id], onUpdate: NoAction)
   templates                                    templates?             @relation(fields: [template_id], references: [id], onUpdate: NoAction)
 
   @@index([approved_by_user_id])
   @@index([area_id])
   @@index([brand_kit_id])
   @@index([created_by_user_id])
-  @@index([format_id])
-  @@index([language_id])
-  @@index([state_id])
   @@index([template_id])
 }
 
@@ -286,29 +239,15 @@ model templates {
   @@index([state_id])
 }
 
-model user_roles {
-  id    String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  code  String  @unique
-  name  String
-  users users[]
-}
-
-model user_states {
-  id    String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  code  String  @unique
-  name  String
-  users users[]
-}
-
 model users {
   id                                                 String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   name                                               String
   last_name                                          String
   email                                              String                 @unique
-  role_id                                            String                 @db.Uuid
-  state_id                                           String                 @db.Uuid
   area_id                                            String?                @db.Uuid
   created_at                                         DateTime               @default(now()) @db.Timestamptz(6)
+  role                                               user_role              @default(USER)
+  state                                              user_state             @default(ACTIVE)
   brand_kit                                          brand_kit[]
   commentary                                         commentary[]
   newsletter_state_log                               newsletter_state_log[]
@@ -316,10 +255,96 @@ model users {
   newsletters_newsletters_created_by_user_idTousers  newsletters[]          @relation("newsletters_created_by_user_idTousers")
   templates                                          templates[]
   areas                                              areas?                 @relation(fields: [area_id], references: [id], onUpdate: NoAction)
-  user_roles                                         user_roles             @relation(fields: [role_id], references: [id], onUpdate: NoAction)
-  user_states                                        user_states            @relation(fields: [state_id], references: [id], onUpdate: NoAction)
 
   @@index([area_id])
-  @@index([role_id])
-  @@index([state_id])
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model permission_categories {
+  id          String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code        String        @unique
+  name        String
+  created_at  DateTime      @default(now()) @db.Timestamptz(6)
+  permissions permissions[]
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model permissions {
+  id                    String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  category_id           String                @db.Uuid
+  code                  String                @unique
+  description           String
+  created_at            DateTime              @default(now()) @db.Timestamptz(6)
+  permission_categories permission_categories @relation(fields: [category_id], references: [id], onUpdate: NoAction)
+  role_permissions      role_permissions[]
+
+  @@index([category_id], map: "idx_permissions_category_id")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model role_permissions {
+  role          user_role
+  permission_id String      @db.Uuid
+  created_at    DateTime    @default(now()) @db.Timestamptz(6)
+  permissions   permissions @relation(fields: [permission_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([role, permission_id])
+  @@index([permission_id], map: "idx_role_permissions_permission_id")
+  @@index([role], map: "idx_role_permissions_role")
+}
+
+enum area_name {
+  COMUNICACION_INTERNA
+  COMUNICACION_CORPORATIVA
+}
+
+enum asset_type {
+  IMAGE
+  ICON
+  LOGO
+  SHAPE
+  LOCKUP
+  KEYWORD
+}
+
+enum block_content_type {
+  LAYOUT
+  BASE
+  DIVIDER
+  CONTENT
+  MULTIMEDIA
+  ICONS
+  SPECIAL
+}
+
+enum newsletter_format {
+  PORTRAIT
+  LANDSCAPE
+}
+
+enum newsletter_language {
+  SPA
+}
+
+enum newsletter_state {
+  DRAFT
+  IN_REVIEW
+  CHANGES_REQUESTED
+  RESUBMITTED
+  APPROVED
+  DISCARDED
+}
+
+enum user_role {
+  ADMIN
+  FUNCTIONAL
+  USER
+}
+
+enum user_state {
+  ACTIVE
+  INACTIVE
+  REMOVED
 }

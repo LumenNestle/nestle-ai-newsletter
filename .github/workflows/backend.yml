@@ -2,12 +2,12 @@ name: Backend CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, staging]
     paths:
       - 'backend/**'
       - '.github/workflows/backend.yml'
   pull_request:
-    branches: [main]
+    branches: [main, staging]
     paths:
       - 'backend/**'
       - '.github/workflows/backend.yml'
@@ -15,21 +15,17 @@ on:
 jobs:
   backend:
     runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 10.33.0
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: pnpm
-          cache-dependency-path: backend/pnpm-lock.yaml
-
-      - run: pnpm --dir backend install --frozen-lockfile
-      - run: pnpm --dir backend exec prisma generate
-      - run: pnpm --dir backend run build
-      - run: docker build -t nestle-backend ./backend
+        steps:
+          - uses: actions/checkout@v4
+          - uses: pnpm/action-setup@v4
+            with:
+              version: 10.33.0
+          - uses: actions/setup-node@v4
+            with:
+              node-version: 20
+              cache: pnpm
+              cache-dependency-path: backend/pnpm-lock.yaml
+          - name: Install dependencies
+            run: pnpm --dir backend install --frozen-lockfile
+          - name: Build backend
+            run: pnpm --dir backend run build

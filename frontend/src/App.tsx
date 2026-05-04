@@ -1,7 +1,26 @@
+import { Box } from '@mui/material'
+import { BrowserRouter as Router, Route, Routes } from 'react-router'
+import { AuthProvider } from './contexts/AuthContext'
+import { NotificationProvider } from './contexts/NotificationContext'
+import { AlertProvider, useNotification } from './hooks/useNotification'
+import { NotificationManager } from './components/NotificationManager'
+import { ProtectedRoute } from './components/ProtectedRoute'
+import { ProtectedLayout } from './components/ProtectedLayout'
+import { LoginPage } from './pages/LoginPage'
+import { DashboardPage } from './pages/DashboardPage'
+import CreatePage from './pages/CreatePage'
+import { EditPage } from './pages/EditPage'
+import TemplatesPage from './pages/TemplatesPage'
+import { AnalyticsPage } from './pages/AnalyticsPage'
+import { ReviewsPage } from './pages/ReviewsPage'
+import { UsersPage } from './pages/UsersPage'
+import { SettingsPage } from './pages/SettingsPage'
+import './App.css'
+
+// Legacy demo pages
 import axios from 'axios'
 import { useMemo, useState } from 'react'
 import {
-  Box,
   Button,
   Chip,
   Container,
@@ -377,7 +396,7 @@ function ColorsPage() {
           {keywordSwatches.map((swatch) => {
             const shadow =
               theme.palette.brand.keywordShadows[
-                swatch.name as keyof typeof theme.palette.brand.keywordShadows
+              swatch.name as keyof typeof theme.palette.brand.keywordShadows
               ]
 
             return (
@@ -553,11 +572,10 @@ function ComponentsPage() {
                   sx={{
                     bgcolor: color,
                     color: 'brand.darkOak',
-                    boxShadow: `4px 4px 0 ${
-                      theme.palette.brand.keywordShadows[
-                        name as keyof typeof theme.palette.brand.keywordShadows
-                      ]
-                    }`,
+                    boxShadow: `4px 4px 0 ${theme.palette.brand.keywordShadows[
+                      name as keyof typeof theme.palette.brand.keywordShadows
+                    ]
+                      }`,
                   }}
                 />
               ))}
@@ -595,7 +613,7 @@ function ComponentsPage() {
   )
 }
 
-function App() {
+function AppContent() {
   const [currentPage, setCurrentPage] = useState<DemoPage>('assets')
   const theme = useTheme()
 
@@ -678,6 +696,212 @@ function App() {
         </Container>
       </Box>
     </Box>
+  )
+}
+
+function AppRouter() {
+  const { notifications, removeNotification } = useNotification()
+
+  return (
+    <Box sx={{ position: 'relative' }}>
+      <Router>
+        <Routes>
+          {/* Public routes */}
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/demo" element={<AppContent />} />
+
+          {/* Protected routes */}
+          <Route
+            path="/dashboard"
+            element={
+              <ProtectedRoute>
+                <ProtectedLayout>
+                  <DashboardPage />
+                </ProtectedLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/crear"
+            element={
+              <ProtectedRoute>
+                <ProtectedLayout>
+                  <CreatePage />
+                </ProtectedLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/editar/:id"
+            element={
+              <ProtectedRoute>
+                <ProtectedLayout>
+                  <EditPage />
+                </ProtectedLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/templates"
+            element={
+              <ProtectedRoute allowedRoles={['ADMIN', 'FUNCTIONAL']}>
+                <ProtectedLayout>
+                  <TemplatesPage />
+                </ProtectedLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/analytics"
+            element={
+              <ProtectedRoute allowedRoles={['ADMIN', 'FUNCTIONAL']}>
+                <ProtectedLayout>
+                  <AnalyticsPage />
+                </ProtectedLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/reviews"
+            element={
+              <ProtectedRoute >
+                <ProtectedLayout>
+                  <ReviewsPage />
+                </ProtectedLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/users"
+            element={
+              <ProtectedRoute allowedRoles={['ADMIN']}>
+                <ProtectedLayout>
+                  <UsersPage />
+                </ProtectedLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/settings"
+            element={
+              <ProtectedRoute>
+                <ProtectedLayout>
+                  <SettingsPage />
+                </ProtectedLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/templates"
+            element={
+              <h1 className="titulo-templates">
+                Página de templates en construcción
+              </h1>
+            }
+          />
+          <Route
+            path="/newsletters"
+            element={
+              <h1 className="titulo-templates">
+                Página de newsletters en construcción
+              </h1>
+            }
+          />
+          <Route
+            path="/newsletters/edit/:id"
+            element={
+              <h1 className="titulo-templates">
+                Página de newsletters por ID en construcción
+              </h1>
+            }
+          />
+          <Route
+            path="/reviews/:id"
+            element={
+              <h1 className="titulo-templates">
+                Página de reviews por newsletter id en construcción
+              </h1>
+            }
+          />
+          <Route
+            path="/admin/templates"
+            element={
+              <h1 className="titulo-templates">
+                Página de templates SUPER ADMIN en construcción
+              </h1>
+            }
+          />
+          <Route
+            path="/admin/templates/create"
+            element={
+              <h1 className="titulo-templates">
+                Página de templates creación SUPER ADMIN en construcción
+              </h1>
+            }
+          />
+          <Route
+            path="/admin/templates/edit/:id"
+            element={
+              <h1 className="titulo-templates">
+                Página de templates edición SUPER ADMIN en construcción
+              </h1>
+            }
+          />
+          <Route
+            path="/newsletters/preview/:id"
+            element={
+              <h1 className="titulo-templates">
+                Página de newsletters preview en construcción
+              </h1>
+            }
+          />
+          <Route
+            path="/logs"
+            element={
+              <h1 className="titulo-templates">
+                Página de logs en construcción
+              </h1>
+            }
+          />
+          <Route
+            path="/backoffice"
+            element={
+              <h1 className="titulo-templates">
+                Página de backoffice en construcción
+              </h1>
+            }
+          />
+          <Route
+            path="/branding"
+            element={
+              <h1 className="titulo-templates">
+                Página de branding en construcción
+              </h1>
+            }
+          />
+          {/* Redirect to login by default */}
+          <Route path="/" element={<LoginPage />} />
+        </Routes>
+      </Router>
+
+      {/* Global notification manager */}
+      <NotificationManager
+        notifications={notifications}
+        onClose={removeNotification}
+      />
+    </Box>
+  )
+}
+
+function App() {
+  return (
+    <AuthProvider>
+      <AlertProvider>
+        <NotificationProvider>
+          <AppRouter />
+        </NotificationProvider>
+      </AlertProvider>
+    </AuthProvider>
   )
 }
 

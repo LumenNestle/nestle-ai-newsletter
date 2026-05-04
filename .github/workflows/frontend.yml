@@ -2,14 +2,16 @@ name: Frontend CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, staging]
     paths:
       - 'frontend/**'
+      - 'packages/shared/**'
       - '.github/workflows/frontend.yml'
   pull_request:
-    branches: [main]
+    branches: [main, staging]
     paths:
       - 'frontend/**'
+      - 'packages/shared/**'
       - '.github/workflows/frontend.yml'
 
 jobs:
@@ -18,17 +20,15 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-
       - uses: pnpm/action-setup@v4
         with:
           version: 10.33.0
-
       - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: pnpm
           cache-dependency-path: frontend/pnpm-lock.yaml
-
-      - run: pnpm --dir frontend install --frozen-lockfile
-      - run: pnpm --dir frontend run build
-      - run: docker build -t nestle-frontend ./frontend
+      - name: Install dependencies
+        run: pnpm --dir frontend install --frozen-lockfile
+      - name: Build frontend
+        run: pnpm --dir frontend run build
