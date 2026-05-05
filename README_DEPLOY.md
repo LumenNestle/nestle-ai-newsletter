@@ -81,7 +81,10 @@ Run these commands only the first time, when PostgreSQL is empty:
 ```bash
 docker compose -f docker-compose.deploy.yml --env-file .env.deploy exec -T postgres sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"' < database/init.sql
 docker compose -f docker-compose.deploy.yml --env-file .env.deploy exec -T postgres sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"' < database/seed.sql
+docker compose -f docker-compose.deploy.yml --env-file .env.deploy --profile seed up assets-seed
 ```
+
+`database/seed.sql` bootstraps the relational catalog required by the binary catalog seed, including `font_groups`, `brand_kit`, `template_states`, and `export_types`.
 
 ## Validate Access
 
@@ -110,6 +113,7 @@ MinIO bucket commands:
 ```bash
 docker compose -f docker-compose.deploy.yml --env-file .env.deploy up -d minio minio-init
 docker compose -f docker-compose.deploy.yml --env-file .env.deploy logs minio-init
+docker compose -f docker-compose.deploy.yml --env-file .env.deploy --profile seed up assets-seed
 ```
 
 ## Notes
@@ -119,5 +123,5 @@ docker compose -f docker-compose.deploy.yml --env-file .env.deploy logs minio-in
 - MinIO replaces Supabase Storage in this deployment setup.
 - Buckets are created automatically by `minio-init`.
 - Buckets are private by default.
-- Asset, font, and export uploads will be implemented in a later phase.
+- `assets-seed` uploads the catalog from `backend/assets` and reflects it into PostgreSQL.
 - PostgreSQL stores metadata only; binary content stays in MinIO.

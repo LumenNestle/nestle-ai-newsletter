@@ -1,12 +1,13 @@
 import 'dotenv/config';
 import { existsSync } from 'node:fs';
 import { readFile, readdir } from 'node:fs/promises';
-import { basename, extname, relative, resolve, sep } from 'node:path';
+import { basename, extname, posix, relative, resolve, sep } from 'node:path';
 import { Logger, Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import { asset_type } from '@prisma/client';
 import { AssetsService } from '../src/assets/assets.service';
+import { FontsService } from '../src/fonts/fonts.service';
 import { PrismaModule } from '../src/prisma/prisma.module';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { StorageService } from '../src/storage/storage.service';
@@ -24,6 +25,10 @@ type SeedFile = {
   absolutePath: string;
   relativePath: string;
   storageKey: string;
+  bucket: string;
+  objectPrefix: string;
+  fileName: string;
+  extension: string | null;
   mimeType: string;
   target: AssetSeedTarget;
 };
@@ -39,9 +44,14 @@ type ScriptOptions = {
     }),
     PrismaModule,
   ],
-  providers: [AssetsService, StorageService],
+  providers: [AssetsService, FontsService, StorageService],
 })
 class AssetSeedScriptModule {}
+
+const assetBucketName =
+  process.env.S3_ASSETS_BUCKET?.trim() || 'nestle-ai-newsletter-assets';
+const fontBucketName =
+  process.env.S3_FONTS_BUCKET?.trim() || 'nestle-ai-newsletter-fonts';
 
 async function main(): Promise<void> {
   const options = parseArguments(process.argv.slice(2));
@@ -58,7 +68,9 @@ async function main(): Promise<void> {
   try {
     const storageService = app.get(StorageService);
     const assetsService = app.get(AssetsService);
+    const fontsService = app.get(FontsService);
     const prisma = app.get(PrismaService);
+    await assertDatabaseReady(prisma);
     const seedFiles = await discoverSeedFiles(options.sourceDirectory);
 
     let seededAssets = 0;
@@ -68,22 +80,32 @@ async function main(): Promise<void> {
       const buffer = await readFile(seedFile.absolutePath);
 
       await storageService.uploadObject(
+        seedFile.bucket,
         seedFile.storageKey,
         buffer,
         seedFile.mimeType,
       );
 
       if (seedFile.target.kind === 'font') {
-        await upsertFont(prisma, seedFile);
+        await fontsService.upsertSeededFont({
+          name: seedFile.fileName,
+          groupName: inferFontGroupName(seedFile.relativePath),
+          storageKey: seedFile.storageKey,
+          mimeType: seedFile.mimeType,
+          sizeBytes: buffer.length,
+        });
         seededFonts += 1;
         continue;
       }
 
       await assetsService.upsertSeededAsset({
-        name: basename(seedFile.relativePath),
+        name: seedFile.fileName,
         type: seedFile.target.type,
         storageKey: seedFile.storageKey,
         description: seedFile.relativePath,
+        mimeType: seedFile.mimeType,
+        sizeBytes: buffer.length,
+        fromBrand: true,
       });
       seededAssets += 1;
     }
@@ -151,11 +173,17 @@ async function walkFiles(directory: string): Promise<string[]> {
 function buildSeedFile(sourceDirectory: string, absolutePath: string): SeedFile {
   const relativePath = relative(sourceDirectory, absolutePath).split(sep).join('/');
   const target = inferSeedTarget(relativePath);
+  const storageKey = buildStorageKey(relativePath, target);
+  const bucket = target.kind === 'font' ? fontBucketName : assetBucketName;
 
   return {
     absolutePath,
     relativePath,
-    storageKey: `assets/${relativePath}`,
+    storageKey,
+    bucket,
+    objectPrefix: getObjectPrefix(storageKey),
+    fileName: basename(relativePath),
+    extension: getExtension(relativePath),
     mimeType: resolveMimeType(absolutePath),
     target,
   };
@@ -166,7 +194,7 @@ function inferSeedTarget(relativePath: string): AssetSeedTarget {
     return { kind: 'font' };
   }
 
-  if (relativePath.startsWith('brand_shapes/')) {
+  if (relativePath.startsWith('shapes/')) {
     return { kind: 'asset', type: asset_type.SHAPE };
   }
 
@@ -178,11 +206,42 @@ function inferSeedTarget(relativePath: string): AssetSeedTarget {
     return { kind: 'asset', type: asset_type.LOGO };
   }
 
-  if (relativePath.startsWith('we_make_nestle/')) {
+  if (relativePath.startsWith('lockups/')) {
     return { kind: 'asset', type: asset_type.LOCKUP };
   }
 
   throw new Error(`Cannot infer asset type from path: ${relativePath}`);
+}
+
+function buildStorageKey(
+  relativePath: string,
+  target: AssetSeedTarget,
+): string {
+  if (target.kind === 'font') {
+    return buildFontStorageKey(relativePath);
+  }
+
+  if (relativePath.startsWith('shapes/brands/')) {
+    return `assets/shapes/brand/${relativePath.slice('shapes/brands/'.length)}`;
+  }
+
+  if (relativePath.startsWith('shapes/mosaics/')) {
+    return `assets/shapes/mosaics/${relativePath.slice('shapes/mosaics/'.length)}`;
+  }
+
+  return `assets/${relativePath}`;
+}
+
+function buildFontStorageKey(relativePath: string): string {
+  const segments = relativePath.split('/');
+
+  if (segments.length <= 2) {
+    return `fonts/nestle/${segments[segments.length - 1]}`;
+  }
+
+  const brandSegment = normalizeStoragePathSegment(segments[1]);
+  const fileSegments = segments.slice(2).join('/');
+  return `fonts/${brandSegment}/${fileSegments}`;
 }
 
 function resolveMimeType(filePath: string): string {
@@ -213,34 +272,60 @@ function resolveMimeType(filePath: string): string {
   }
 }
 
-async function upsertFont(prisma: PrismaService, seedFile: SeedFile): Promise<void> {
-  const existingFont = await prisma.fonts.findFirst({
-    where: {
-      url: seedFile.storageKey,
-    },
-    select: {
-      id: true,
-    },
-  });
+function inferFontGroupName(relativePath: string): string {
+  const segments = relativePath.split('/');
+  const groupSegment = segments.length <= 2 ? 'nestle' : segments[1];
 
-  const fontData = {
-    name: basename(seedFile.relativePath),
-    url: seedFile.storageKey,
-  };
-
-  if (existingFont) {
-    await prisma.fonts.update({
-      where: {
-        id: existingFont.id,
-      },
-      data: fontData,
-    });
-    return;
+  if (!groupSegment) {
+    return 'Nestle';
   }
 
-  await prisma.fonts.create({
-    data: fontData,
-  });
+  return groupSegment
+    .split(/[-_]+/)
+    .filter(Boolean)
+    .map((segment) => segment[0]?.toUpperCase() + segment.slice(1))
+    .join(' ');
+}
+
+function normalizeStoragePathSegment(value: string): string {
+  return (
+    value
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '') || 'default'
+  );
+}
+
+async function assertDatabaseReady(prisma: PrismaService): Promise<void> {
+  await assertTableExists(prisma, 'assets');
+  await assertTableExists(prisma, 'fonts');
+  await assertTableExists(prisma, 'font_groups');
+}
+
+async function assertTableExists(
+  prisma: PrismaService,
+  tableName: string,
+): Promise<void> {
+  const result = await prisma.$queryRawUnsafe<Array<{ relation_name: string | null }>>(
+    `SELECT to_regclass('public.${tableName}')::text AS relation_name`,
+  );
+
+  if (!result[0]?.relation_name) {
+    throw new Error(
+      `Required table public.${tableName} is missing. Run database/init.sql and database/seed.sql before assets:seed-minio.`,
+    );
+  }
+}
+
+function getObjectPrefix(storageKey: string): string {
+  const objectPrefix = posix.dirname(storageKey);
+  return objectPrefix === '.' ? '' : objectPrefix;
+}
+
+function getExtension(filePath: string): string | null {
+  const extension = extname(filePath).toLowerCase();
+  return extension ? extension.slice(1) : null;
 }
 
 function printUsage(): void {

@@ -5,4 +5,5 @@ export enum Resource {
     AI = 'ai',
     AREAS = 'areas',
     ASSETS = 'assets',
+    FONTS = 'fonts',
 }

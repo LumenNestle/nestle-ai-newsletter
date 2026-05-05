@@ -57,7 +57,7 @@ async function main(): Promise<void> {
     );
 
     Logger.log(
-      `Uploaded ${response.assets.length} asset(s) to bucket ${process.env.S3_BUCKET}.`,
+      `Uploaded ${response.assets.length} asset(s) to bucket ${process.env.S3_ASSETS_BUCKET}.`,
       'TestMinioUploadScript',
     );
     response.assets.forEach((asset) => {

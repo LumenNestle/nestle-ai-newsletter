@@ -15,13 +15,14 @@ export class StorageService {
   constructor(private readonly configService: ConfigService) {}
 
   async uploadObject(
+    bucket: string,
     key: string,
     body: Buffer,
     contentType: string,
   ): Promise<void> {
     await this.getClient().send(
       new PutObjectCommand({
-        Bucket: this.getBucket(),
+        Bucket: bucket,
         Key: key,
         Body: body,
         ContentType: contentType,
@@ -29,20 +30,20 @@ export class StorageService {
     );
   }
 
-  async deleteObject(key: string): Promise<void> {
+  async deleteObject(bucket: string, key: string): Promise<void> {
     await this.getClient().send(
       new DeleteObjectCommand({
-        Bucket: this.getBucket(),
+        Bucket: bucket,
         Key: key,
       }),
     );
   }
 
-  async getSignedUrl(key: string): Promise<string> {
+  async getSignedUrl(bucket: string, key: string): Promise<string> {
     return getSignedUrl(
       this.getClient(),
       new GetObjectCommand({
-        Bucket: this.getBucket(),
+        Bucket: bucket,
         Key: key,
       }),
       { expiresIn: 3600 },
@@ -67,18 +68,30 @@ export class StorageService {
     return this.client;
   }
 
-  private getBucket(): string {
-    return this.readRequiredEnv('S3_BUCKET');
+  getAssetsBucket(): string {
+    return this.readRequiredEnv('S3_ASSETS_BUCKET');
+  }
+
+  getFontsBucket(): string {
+    return this.readRequiredEnv('S3_FONTS_BUCKET');
+  }
+
+  getExportsBucket(): string {
+    return this.readRequiredEnv('S3_EXPORTS_BUCKET');
   }
 
   private readRequiredEnv(key: string): string {
-    const value = this.configService.get<string>(key)?.trim();
+    const value = this.readOptionalEnv(key);
 
     if (!value) {
       throw new Error(`${key} is not configured.`);
     }
 
     return value;
+  }
+
+  private readOptionalEnv(key: string): string | undefined {
+    return this.configService.get<string>(key)?.trim() || undefined;
   }
 
   private readBooleanEnv(key: string): boolean {

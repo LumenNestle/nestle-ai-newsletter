@@ -1,50 +1,51 @@
--- =========================
--- SEED MÍNIMO - RBAC + ÁREAS + USUARIOS DE PRUEBA
--- =========================
+-- ========================================
+-- FOUNDATIONAL SEED - RBAC + AREAS + USERS
+-- + FONT GROUPS + BRAND KITS + TEMPLATE STATES + EXPORT TYPES
+-- ========================================
 
--- =========================
--- CATEGORÍAS DE PERMISOS
--- =========================
+-- ========================================
+-- PERMISSION CATEGORIES
+-- ========================================
 
 INSERT INTO public.permission_categories (code, name) VALUES
-('ACCESS_MANAGEMENT', 'Gestión de Accesos'),
-('CONFIGURATION', 'Configuración'),
+('ACCESS_MANAGEMENT', 'Gestion de Accesos'),
+('CONFIGURATION', 'Configuracion'),
 ('TEMPLATES', 'Plantillas'),
 ('CONTENT', 'Contenido'),
-('REVIEW', 'Revisión'),
+('REVIEW', 'Revision'),
 ('TRACEABILITY', 'Trazabilidad')
 ON CONFLICT (code) DO UPDATE
 SET name = EXCLUDED.name;
 
--- =========================
--- PERMISOS
--- =========================
+-- ========================================
+-- PERMISSIONS
+-- ========================================
 
 INSERT INTO public.permissions (category_id, code, description)
 SELECT pc.id, v.code, v.description
 FROM (
   VALUES
     ('ACCESS_MANAGEMENT', 'USER_MANAGE', 'Alta/Baja de usuarios'),
-    ('ACCESS_MANAGEMENT', 'ROLE_ASSIGN', 'Asignación de roles'),
-    ('ACCESS_MANAGEMENT', 'SECURITY_POLICY_DEFINE', 'Definición de políticas de seguridad y acceso'),
+    ('ACCESS_MANAGEMENT', 'ROLE_ASSIGN', 'Asignacion de roles'),
+    ('ACCESS_MANAGEMENT', 'SECURITY_POLICY_DEFINE', 'Definicion de politicas de seguridad y acceso'),
 
-    ('CONFIGURATION', 'PROMPT_MANAGE', 'Backoffice y gestión de Prompts de IA'),
-    ('CONFIGURATION', 'BRAND_MANAGE', 'Gestión de estilos de marca'),
+    ('CONFIGURATION', 'PROMPT_MANAGE', 'Backoffice y gestion de Prompts de IA'),
+    ('CONFIGURATION', 'BRAND_MANAGE', 'Gestion de estilos de marca'),
 
-    ('TEMPLATES', 'TEMPLATE_CREATE_RETIRE', 'Creación y retiro de templates corporativos'),
-    ('TEMPLATES', 'TEMPLATE_EDIT', 'Edición de templates'),
+    ('TEMPLATES', 'TEMPLATE_CREATE_RETIRE', 'Creacion y retiro de templates corporativos'),
+    ('TEMPLATES', 'TEMPLATE_EDIT', 'Edicion de templates'),
     ('TEMPLATES', 'TEMPLATE_VIEW_COPY', 'Ver y copiar templates existentes'),
 
-    ('CONTENT', 'CONTENT_GENERATE_AI', 'Generación de contenido vía IA'),
+    ('CONTENT', 'CONTENT_GENERATE_AI', 'Generacion de contenido via IA'),
     ('CONTENT', 'CONTENT_UPLOAD', 'Carga de contenido y archivos'),
-    ('CONTENT', 'CONTENT_EXPORT_APPROVED', 'Exportación de contenidos aprobados'),
+    ('CONTENT', 'CONTENT_EXPORT_APPROVED', 'Exportacion de contenidos aprobados'),
 
-    ('REVIEW', 'REVIEW_REQUEST_PREVIEW', 'Solicitud de revisión y previsualización'),
-    ('REVIEW', 'REVIEW_COMMENT_CREATE', 'Crear comentarios de revisión'),
-    ('REVIEW', 'REVIEW_COMMENT_VIEW_REPLY', 'Ver y responder a comentarios de revisión'),
-    ('REVIEW', 'REVIEW_FINAL_APPROVE_COMMENT', 'Aprobación final y comentarios'),
+    ('REVIEW', 'REVIEW_REQUEST_PREVIEW', 'Solicitud de revision y previsualizacion'),
+    ('REVIEW', 'REVIEW_COMMENT_CREATE', 'Crear comentarios de revision'),
+    ('REVIEW', 'REVIEW_COMMENT_VIEW_REPLY', 'Ver y responder a comentarios de revision'),
+    ('REVIEW', 'REVIEW_FINAL_APPROVE_COMMENT', 'Aprobacion final y comentarios'),
 
-    ('TRACEABILITY', 'AUDIT_LOGS_METRICS_VIEW', 'Logs de auditoría y métricas de uso')
+    ('TRACEABILITY', 'AUDIT_LOGS_METRICS_VIEW', 'Logs de auditoria y metricas de uso')
 ) AS v(category_code, code, description)
 JOIN public.permission_categories pc
   ON pc.code = v.category_code
@@ -53,17 +54,15 @@ SET
   category_id = EXCLUDED.category_id,
   description = EXCLUDED.description;
 
--- =========================
--- PERMISOS POR ROL
--- =========================
+-- ========================================
+-- ROLE PERMISSIONS
+-- ========================================
 
--- ADMIN: todos los permisos
 INSERT INTO public.role_permissions (role, permission_id)
 SELECT 'ADMIN'::user_role, id
 FROM public.permissions
 ON CONFLICT (role, permission_id) DO NOTHING;
 
--- FUNCTIONAL: administrador funcional
 INSERT INTO public.role_permissions (role, permission_id)
 SELECT 'FUNCTIONAL'::user_role, id
 FROM public.permissions
@@ -81,7 +80,6 @@ WHERE code IN (
 )
 ON CONFLICT (role, permission_id) DO NOTHING;
 
--- USER: usuario general
 INSERT INTO public.role_permissions (role, permission_id)
 SELECT 'USER'::user_role, id
 FROM public.permissions
@@ -94,19 +92,18 @@ WHERE code IN (
 )
 ON CONFLICT (role, permission_id) DO NOTHING;
 
--- =========================
--- ÁREAS
--- =========================
+-- ========================================
+-- AREAS
+-- ========================================
 
 INSERT INTO public.areas (name) VALUES
 ('COMUNICACION_INTERNA'::area_name),
 ('COMUNICACION_CORPORATIVA'::area_name)
 ON CONFLICT (name) DO NOTHING;
 
-
--- =========================
--- USUARIOS DE PRUEBA
--- =========================
+-- ========================================
+-- TEST USERS
+-- ========================================
 
 INSERT INTO public.users (
   name,
@@ -138,3 +135,122 @@ SET
   area_id = EXCLUDED.area_id,
   role = EXCLUDED.role,
   state = EXCLUDED.state;
+
+-- ========================================
+-- FONT GROUPS
+-- ========================================
+
+INSERT INTO public.font_groups (name)
+VALUES
+  ('Nestle'),
+  ('Purina'),
+  ('Kit Kat'),
+  ('Maggi'),
+  ('Nescafe'),
+  ('Nescau'),
+  ('Nespresso'),
+  ('Milo'),
+  ('Nido'),
+  ('Perrier'),
+  ('San Pellegrino'),
+  ('Gerber'),
+  ('Carnation'),
+  ('Nestle Classic'),
+  ('Nestle Health Science')
+ON CONFLICT (name) DO NOTHING;
+
+-- ========================================
+-- EXPORT TYPES
+-- ========================================
+
+INSERT INTO public.export_types (code, name)
+VALUES
+  ('HTML', 'HTML'),
+  ('PDF', 'PDF'),
+  ('MJML', 'MJML')
+ON CONFLICT (code) DO UPDATE
+SET name = EXCLUDED.name;
+
+-- ========================================
+-- TEMPLATE STATES
+-- ========================================
+
+INSERT INTO public.template_states (code, name)
+VALUES
+  ('DRAFT', 'Borrador'),
+  ('ACTIVE', 'Activa'),
+  ('RETIRED', 'Retirada')
+ON CONFLICT (code) DO UPDATE
+SET name = EXCLUDED.name;
+
+-- ========================================
+-- BRAND KITS
+-- ========================================
+
+WITH desired_brand_kits AS (
+  SELECT
+    v.name,
+    fg.id AS font_group_id
+  FROM (
+    VALUES
+      ('Nestle'),
+      ('Purina'),
+      ('Kit Kat'),
+      ('Maggi'),
+      ('Nescafe'),
+      ('Nescau'),
+      ('Nespresso'),
+      ('Milo'),
+      ('Nido'),
+      ('Perrier'),
+      ('San Pellegrino'),
+      ('Gerber'),
+      ('Carnation'),
+      ('Nestle Classic'),
+      ('Nestle Health Science')
+  ) AS v(name)
+  LEFT JOIN public.font_groups fg
+    ON fg.name = v.name
+)
+UPDATE public.brand_kit bk
+SET
+  font_group_id = d.font_group_id,
+  active = true,
+  deleted_at = NULL,
+  updated_at = now()
+FROM desired_brand_kits d
+WHERE bk.name = d.name;
+
+WITH desired_brand_kits AS (
+  SELECT
+    v.name,
+    fg.id AS font_group_id
+  FROM (
+    VALUES
+      ('Nestle'),
+      ('Purina'),
+      ('Kit Kat'),
+      ('Maggi'),
+      ('Nescafe'),
+      ('Nescau'),
+      ('Nespresso'),
+      ('Milo'),
+      ('Nido'),
+      ('Perrier'),
+      ('San Pellegrino'),
+      ('Gerber'),
+      ('Carnation'),
+      ('Nestle Classic'),
+      ('Nestle Health Science')
+  ) AS v(name)
+  LEFT JOIN public.font_groups fg
+    ON fg.name = v.name
+)
+INSERT INTO public.brand_kit (name, font_group_id, active)
+SELECT d.name, d.font_group_id, true
+FROM desired_brand_kits d
+WHERE NOT EXISTS (
+  SELECT 1
+  FROM public.brand_kit bk
+  WHERE bk.name = d.name
+);

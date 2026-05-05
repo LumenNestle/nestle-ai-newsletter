@@ -8,21 +8,24 @@ function createService() {
   const uploadObjectMock = jest.fn().mockResolvedValue(undefined);
   const getSignedUrlMock = jest
     .fn()
-    .mockResolvedValue('http://localhost:9000/nestle-assets/fake');
+    .mockResolvedValue('http://localhost:9000/nestle-ai-newsletter-assets/fake');
   const prisma = {
     assets: {
       create: jest.fn().mockResolvedValue({
         id: 'asset-id',
         name: 'banner.png',
         type: 'IMAGE',
-        url: 'assets/uploads/image/banner-fake.png',
+        bucket: 'nestle-ai-newsletter-assets',
+        object_key: 'assets/uploads/image/banner-fake.png',
       }),
       findMany: jest.fn().mockResolvedValue([
         {
           id: 'seed-asset-id',
           name: 'dark-green.svg',
           type: 'SHAPE',
-          url: 'assets/brand_shapes/isolated-by-brand/maggi/bottle/dark-green.svg',
+          bucket: 'nestle-ai-newsletter-assets',
+          object_key:
+            'assets/brand_shapes/isolated-by-brand/maggi/bottle/dark-green.svg',
         },
       ]),
       findFirst: jest.fn().mockResolvedValue(null),
@@ -33,6 +36,9 @@ function createService() {
   const storageService = {
     uploadObject: uploadObjectMock,
     getSignedUrl: getSignedUrlMock,
+    getAssetsBucket: jest
+      .fn()
+      .mockReturnValue('nestle-ai-newsletter-assets'),
   } as unknown as StorageService;
 
   return {
@@ -66,12 +72,17 @@ describe('AssetsService', () => {
           id: 'asset-id',
           name: 'banner.png',
           type: 'IMAGE',
-          url: 'http://localhost:9000/nestle-assets/fake',
+          url: 'http://localhost:9000/nestle-ai-newsletter-assets/fake',
         },
       ],
     });
 
-    expect(uploadObjectMock).toHaveBeenCalled();
+    expect(uploadObjectMock).toHaveBeenCalledWith(
+      'nestle-ai-newsletter-assets',
+      expect.stringMatching(/^assets\/uploads\/image\/banner-/),
+      Buffer.from('fake'),
+      'image/png',
+    );
   });
 
   it('lists persisted assets with signed urls', async () => {
@@ -83,7 +94,7 @@ describe('AssetsService', () => {
           id: 'seed-asset-id',
           name: 'dark-green.svg',
           type: 'SHAPE',
-          url: 'http://localhost:9000/nestle-assets/fake',
+          url: 'http://localhost:9000/nestle-ai-newsletter-assets/fake',
         },
       ],
     });

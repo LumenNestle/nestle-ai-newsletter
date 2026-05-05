@@ -6,9 +6,10 @@ import {
 } from '@nestjs/common';
 import { asset_type } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
-import { basename, extname } from 'node:path';
+import { basename, extname, posix } from 'node:path';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
+import type { storage_object_source } from '@prisma/client';
 import type {
   UploadedAssetFile,
   UploadedAssetDto,
@@ -19,7 +20,8 @@ type PersistedAsset = {
   id: string;
   name: string;
   type: asset_type;
-  url: string;
+  bucket: string;
+  object_key: string;
 };
 
 type SeededAssetInput = {
@@ -27,7 +29,13 @@ type SeededAssetInput = {
   type: asset_type;
   storageKey: string;
   description?: string | null;
+  mimeType?: string | null;
+  sizeBytes?: number | bigint | null;
+  fromBrand?: boolean;
 };
+
+const userStorageObjectSource: storage_object_source = 'USER';
+const systemStorageObjectSource: storage_object_source = 'SYSTEM';
 
 @Injectable()
 export class AssetsService {
@@ -60,6 +68,7 @@ export class AssetsService {
           );
 
           await this.storageService.uploadObject(
+            this.getAssetBucketName(),
             storageKey,
             file.buffer,
             file.mimetype,
@@ -68,14 +77,23 @@ export class AssetsService {
           const asset = await this.prisma.assets.create({
             data: {
               name: file.originalname,
-              url: storageKey,
               type,
+              bucket: this.getAssetBucketName(),
+              object_key: storageKey,
+              object_prefix: this.getObjectPrefix(storageKey),
+              file_name: this.getFileName(storageKey),
+              extension: this.getExtension(storageKey),
+              mime_type: file.mimetype,
+              size_bytes: file.size,
+              from_brand: false,
+              source: userStorageObjectSource,
             },
             select: {
               id: true,
               name: true,
               type: true,
-              url: true,
+              bucket: true,
+              object_key: true,
             },
           });
 
@@ -106,7 +124,8 @@ export class AssetsService {
           id: true,
           name: true,
           type: true,
-          url: true,
+          bucket: true,
+          object_key: true,
         },
       });
 
@@ -129,13 +148,15 @@ export class AssetsService {
   ): Promise<UploadedAssetDto> {
     const existingAsset = await this.prisma.assets.findFirst({
       where: {
-        url: input.storageKey,
+        bucket: this.getAssetBucketName(),
+        object_key: input.storageKey,
       },
       select: {
         id: true,
         name: true,
         type: true,
-        url: true,
+        bucket: true,
+        object_key: true,
       },
     });
 
@@ -148,26 +169,43 @@ export class AssetsService {
             name: input.name,
             type: input.type,
             description: input.description ?? null,
+            object_prefix: this.getObjectPrefix(input.storageKey),
+            file_name: this.getFileName(input.storageKey),
+            extension: this.getExtension(input.storageKey),
+            mime_type: input.mimeType ?? null,
+            size_bytes: input.sizeBytes ?? null,
+            from_brand: input.fromBrand ?? true,
+            source: systemStorageObjectSource,
           },
           select: {
             id: true,
             name: true,
             type: true,
-            url: true,
+            bucket: true,
+            object_key: true,
           },
         })
       : await this.prisma.assets.create({
           data: {
             name: input.name,
             type: input.type,
-            url: input.storageKey,
+            bucket: this.getAssetBucketName(),
+            object_key: input.storageKey,
+            object_prefix: this.getObjectPrefix(input.storageKey),
+            file_name: this.getFileName(input.storageKey),
+            extension: this.getExtension(input.storageKey),
             description: input.description ?? null,
+            mime_type: input.mimeType ?? null,
+            size_bytes: input.sizeBytes ?? null,
+            from_brand: input.fromBrand ?? true,
+            source: systemStorageObjectSource,
           },
           select: {
             id: true,
             name: true,
             type: true,
-            url: true,
+            bucket: true,
+            object_key: true,
           },
         });
 
@@ -196,9 +234,15 @@ export class AssetsService {
     asset: PersistedAsset,
   ): Promise<UploadedAssetDto> {
     return {
-      ...asset,
-      url: await this.storageService.getSignedUrl(asset.url),
+      id: asset.id,
+      name: asset.name,
+      type: asset.type,
+      url: await this.storageService.getSignedUrl(asset.bucket, asset.object_key),
     };
+  }
+
+  private getAssetBucketName(): string {
+    return this.storageService.getAssetsBucket();
   }
 
   private createUserUploadStorageKey(
@@ -219,5 +263,19 @@ export class AssetsService {
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-+|-+$/g, '')
       .slice(0, 80) || 'asset';
+  }
+
+  private getObjectPrefix(storageKey: string): string {
+    const objectPrefix = posix.dirname(storageKey);
+    return objectPrefix === '.' ? '' : objectPrefix;
+  }
+
+  private getFileName(storageKey: string): string {
+    return basename(storageKey);
+  }
+
+  private getExtension(storageKey: string): string | null {
+    const extension = extname(storageKey).toLowerCase();
+    return extension ? extension.slice(1) : null;
   }
 }

@@ -23,7 +23,7 @@ Application for creating and managing internal newsletters with a React frontend
 |   `-- pnpm-lock.yaml
 |-- database/
 |   |-- init.sql             # Executable local schema
-|   `-- seed.sql             # Minimal local seed data
+|   `-- seed.sql             # Foundational relational seed data
 |-- .github/workflows/
 |-- docker-compose.yaml
 |-- docker-compose.deploy.yml
@@ -167,20 +167,26 @@ docker compose logs minio-init
 docker compose exec -T postgres psql -U nestle -d nestle_ai_newsletter_db < database/init.sql
 ```
 
-4. Load the seed:
+4. Load the foundational seed:
 
 ```bash
 docker compose exec -T postgres psql -U nestle -d nestle_ai_newsletter_db < database/seed.sql
 ```
 
-5. Validate tables:
+5. Seed catalog assets and fonts into MinIO + PostgreSQL:
+
+```bash
+docker compose --profile seed up assets-seed
+```
+
+6. Validate tables:
 
 ```bash
 docker compose exec postgres psql -U nestle -d nestle_ai_newsletter_db
 \dt
 ```
 
-6. Validate local users:
+7. Validate local users:
 
 ```sql
 SELECT email, role, state
@@ -194,7 +200,7 @@ Expected users:
 - `functional@local.test` with role `FUNCTIONAL`
 - `user@local.test` with role `USER`
 
-7. Validate permissions per role:
+8. Validate permissions per role:
 
 ```sql
 SELECT role, COUNT(*) AS permissions_count
@@ -211,7 +217,16 @@ FUNCTIONAL 10
 USER       5
 ```
 
-8. Validate Prisma:
+9. Validate foundational catalogs:
+
+```sql
+SELECT name FROM public.font_groups ORDER BY name;
+SELECT name FROM public.brand_kit ORDER BY name;
+SELECT code FROM public.template_states ORDER BY code;
+SELECT code FROM public.export_types ORDER BY code;
+```
+
+10. Validate Prisma:
 
 ```bash
 pnpm --dir backend prisma validate
@@ -225,7 +240,7 @@ pnpm --dir backend exec prisma validate
 pnpm --dir backend exec prisma generate
 ```
 
-9. Optional introspection check:
+11. Optional introspection check:
 
 ```bash
 pnpm --dir backend prisma db pull
@@ -241,7 +256,7 @@ git diff backend/prisma/schema.prisma
 
 The expected diff should be empty or cosmetic only. Large structural changes usually mean `database/init.sql` is not aligned with `backend/prisma/schema.prisma`.
 
-10. Validate MinIO buckets:
+12. Validate MinIO buckets:
 
 ```bash
 docker compose ps
@@ -289,7 +304,8 @@ Notes:
 
 - `minio-init` creates the buckets automatically.
 - Buckets are private by default.
-- Asset, font, and export uploads will be implemented in a later phase.
+- `database/seed.sql` bootstraps relational catalog data such as `font_groups`, `brand_kit`, `template_states`, and `export_types`.
+- `assets-seed` uploads the file catalog from `backend/assets` and reflects it into `assets` and `fonts`.
 - No binary content is stored in PostgreSQL.
 
 ### PowerShell Alternative
@@ -461,6 +477,7 @@ First database initialization if PostgreSQL is empty:
 ```bash
 docker compose -f docker-compose.deploy.yml --env-file .env.deploy exec -T postgres sh -lc 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"' < database/init.sql
 docker compose -f docker-compose.deploy.yml --env-file .env.deploy exec -T postgres sh -lc 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"' < database/seed.sql
+docker compose -f docker-compose.deploy.yml --env-file .env.deploy --profile seed up assets-seed
 ```
 
 The backend is not exposed publicly by default in deployment compose. Only the frontend port is published.
