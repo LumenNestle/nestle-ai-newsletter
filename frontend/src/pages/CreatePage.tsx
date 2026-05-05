@@ -48,10 +48,6 @@ import {
 import {
   type GenerateNewsletterRequest,
 } from '../api/ai'
-import { 
-  
-
- } from '../services/newsletters.ts'
 
 // ⚠️ ARREGLAR ⚠️ — la generacion con IA está mockeada, descomentar cuando el servicio ande
 // import {
