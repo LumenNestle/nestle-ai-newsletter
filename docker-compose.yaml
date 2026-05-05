@@ -62,7 +62,9 @@ services:
       S3_FORCE_PATH_STYLE: "true"
 
   backend:
-    build: ./backend
+    build: 
+      context: ./backend
+      dockerfile: Dockerfile
     ports:
       - "3000:3000"
     depends_on:
@@ -83,7 +85,9 @@ services:
       S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin123}
       S3_FORCE_PATH_STYLE: "true"
   frontend:
-    build: ./frontend
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
     ports:
       - "5173:80"
     depends_on:
