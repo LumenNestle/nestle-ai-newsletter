@@ -6,6 +6,7 @@ import React, {
   type ChangeEvent,
   type ReactElement,
 } from 'react'
+import axios from 'axios'
 import { useNavigate } from 'react-router'
 import {
   Alert,
@@ -39,15 +40,20 @@ import templateBriefImage from '../assets/we_make_nestle/wmn-lockup-three-lines-
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft'
 import ChevronRightIcon from '@mui/icons-material/ChevronRight'
 import {
+  type AssetType,
+  type UploadedAsset,
+  listAssets,
+  uploadAssets,
+} from '../api/assets'
+import {
   type GenerateNewsletterRequest,
-} from '../services/ai'
+} from '../api/ai'
 
 // ⚠️ ARREGLAR ⚠️ — la generacion con IA está mockeada, descomentar cuando el servicio ande
 // import {
 //   generateNewsletter as generateNewsletterWithAi,
 //   improveText,
-//   uploadAiAssets,
-// } from '../services/ai'
+// } from '../api/ai'
 
 type NewsletterState =
   | 'DRAFT'
@@ -594,6 +600,7 @@ type NewsletterGenerationForm = {
   contact: string
   linksOrSources: string
   additionalContext: string
+  assetType: AssetType
   files: File[]
 }
 
@@ -603,6 +610,15 @@ const generationFieldLabels: Record<TemplateGenerationField, string> = {
   contact: 'Contacto',
   linksOrSources: 'Link CTA ',
   additionalContext: 'Contexto adicional',
+}
+
+const assetTypeLabels: Record<AssetType, string> = {
+  IMAGE: 'Imagen',
+  ICON: 'Icono',
+  LOGO: 'Logo',
+  SHAPE: 'Forma',
+  LOCKUP: 'Lockup',
+  KEYWORD: 'Keyword',
 }
 
 const splitLines = (value: string): string[] =>
@@ -653,9 +669,17 @@ function GenerationForm({
     contact: '',
     linksOrSources: '',
     additionalContext: '',
+    assetType: 'IMAGE',
     files: [],
   })
   const [formErrors, setFormErrors] = useState<Record<string, string>>({})
+  const [availableAssets, setAvailableAssets] = useState<UploadedAsset[]>([])
+  const [uploadedAssets, setUploadedAssets] = useState<UploadedAsset[]>([])
+  const [selectedExistingAssetIds, setSelectedExistingAssetIds] = useState<string[]>([])
+  const [assetListError, setAssetListError] = useState<string | null>(null)
+  const [isLoadingAssets, setIsLoadingAssets] = useState(false)
+  const [assetUploadError, setAssetUploadError] = useState<string | null>(null)
+  const [isUploadingAssets, setIsUploadingAssets] = useState(false)
   const visibleGenerationFields = new Set<TemplateGenerationField>([
     ...selectedTemplate.requiredGenerationFields,
     ...selectedTemplate.optionalGenerationFields,
@@ -669,6 +693,43 @@ function GenerationForm({
       return nextErrors
     })
   }
+
+  useEffect(() => {
+    let isMounted = true
+
+    const loadAvailableAssets = async () => {
+      setIsLoadingAssets(true)
+      setAssetListError(null)
+
+      try {
+        const response = await listAssets(form.assetType)
+
+        if (!isMounted) return
+
+        setAvailableAssets(response.assets)
+      } catch (error) {
+        if (!isMounted) return
+
+        const fallbackMessage = 'No se pudieron obtener los assets disponibles.'
+        setAssetListError(
+          axios.isAxiosError(error)
+            ? error.response?.data?.message ?? fallbackMessage
+            : fallbackMessage,
+        )
+        setAvailableAssets([])
+      } finally {
+        if (isMounted) {
+          setIsLoadingAssets(false)
+        }
+      }
+    }
+
+    void loadAvailableAssets()
+
+    return () => {
+      isMounted = false
+    }
+  }, [form.assetType])
 
   const validateForm = (): boolean => {
     const errors: Record<string, string> = {}
@@ -699,13 +760,33 @@ function GenerationForm({
 
   const submitGenerationForm = async () => {
     if (!validateForm()) return
+    let assetIds = [...selectedExistingAssetIds]
+    setAssetUploadError(null)
 
-    // ⚠️ ARREGLAR ⚠️ — upload de assets desactivado, descomentar cuando el servicio ande
-    // let assetIds: string[] = []
-    // if (form.files.length > 0) {
-    //   const uploadResponse = await uploadAiAssets(form.files)
-    //   assetIds = uploadResponse.assets.map((asset) => asset.id)
-    // }
+    if (form.files.length > 0) {
+      setIsUploadingAssets(true)
+
+      try {
+        const uploadResponse = await uploadAssets(form.files, form.assetType)
+        setUploadedAssets(uploadResponse.assets)
+        assetIds = [
+          ...selectedExistingAssetIds,
+          ...uploadResponse.assets.map((asset) => asset.id),
+        ]
+      } catch (error) {
+        const fallbackMessage = 'No se pudieron cargar los assets en este momento.'
+        setAssetUploadError(
+          axios.isAxiosError(error)
+            ? error.response?.data?.message ?? fallbackMessage
+            : fallbackMessage,
+        )
+        return
+      } finally {
+        setIsUploadingAssets(false)
+      }
+    } else {
+      setUploadedAssets([])
+    }
 
     const request: GenerateNewsletterRequest = {
       area: selectedTemplate.area,
@@ -720,7 +801,7 @@ function GenerationForm({
       contact: form.contact.trim() || undefined,
       linksOrSources: splitLines(form.linksOrSources),
       additionalContext: form.additionalContext.trim() || undefined,
-      assetIds: [],
+      assetIds,
     }
 
     await context.onGenerate(request)
@@ -729,6 +810,7 @@ function GenerationForm({
   return (
     <Stack spacing={2}>
       {context.aiError && <Alert severity="error">{context.aiError}</Alert>}
+      {assetUploadError && <Alert severity="error">{assetUploadError}</Alert>}
       <Alert severity="info">
         Plantilla seleccionada: {selectedTemplate.name}
       </Alert>
@@ -884,10 +966,89 @@ function GenerationForm({
           />
         )}
 
-        {/* ⚠️ ARREGLAR ⚠️ — upload desactivado */}
-        <Button variant="outlined" disabled>
-          Cargar imagenes o assets (desactivado)
+        <FormControl fullWidth size="small">
+          <InputLabel id="asset-type-label">Tipo de asset</InputLabel>
+          <Select
+            labelId="asset-type-label"
+            label="Tipo de asset"
+            value={form.assetType}
+            onChange={(event: SelectChangeEvent<AssetType>) => {
+              updateFormField('assetType', event.target.value)
+              setSelectedExistingAssetIds([])
+              setUploadedAssets([])
+              setAssetUploadError(null)
+            }}
+          >
+            {Object.entries(assetTypeLabels).map(([value, label]) => (
+              <MenuItem key={value} value={value}>
+                {label}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+        {assetListError && <Alert severity="error">{assetListError}</Alert>}
+        {isLoadingAssets ? (
+          <Alert severity="info">Cargando assets existentes...</Alert>
+        ) : availableAssets.length > 0 ? (
+          <Stack spacing={1}>
+            <Typography variant="subtitle2">Assets existentes</Typography>
+            <Stack
+              direction="row"
+              spacing={1}
+              useFlexGap
+              sx={{ flexWrap: 'wrap' }}
+            >
+              {availableAssets.map((asset) => {
+                const isSelected = selectedExistingAssetIds.includes(asset.id)
+
+                return (
+                  <Chip
+                    key={asset.id}
+                    label={asset.name}
+                    color={isSelected ? 'primary' : 'default'}
+                    variant={isSelected ? 'filled' : 'outlined'}
+                    onClick={() =>
+                      setSelectedExistingAssetIds((currentIds) =>
+                        currentIds.includes(asset.id)
+                          ? currentIds.filter((id) => id !== asset.id)
+                          : [...currentIds, asset.id],
+                      )
+                    }
+                  />
+                )
+              })}
+            </Stack>
+          </Stack>
+        ) : (
+          <Alert severity="info">
+            No hay assets existentes para este tipo.
+          </Alert>
+        )}
+        <Button variant="outlined" component="label">
+          Seleccionar imagenes o assets
+          <input
+            hidden
+            type="file"
+            multiple
+            accept=".jpg,.jpeg,.png,.webp,.gif,.svg"
+            onChange={(event: ChangeEvent<HTMLInputElement>) => {
+              const files = Array.from(event.target.files ?? [])
+              updateFormField('files', files)
+              setUploadedAssets([])
+              setAssetUploadError(null)
+            }}
+          />
         </Button>
+        {form.files.length > 0 && (
+          <Alert severity="info">
+            Archivos seleccionados: {form.files.map((file) => file.name).join(', ')}
+          </Alert>
+        )}
+        {uploadedAssets.length > 0 && (
+          <Alert severity="success">
+            Assets cargados: {uploadedAssets.map((asset) => asset.name).join(', ')}
+          </Alert>
+        )}
       </Stack>
 
       <Divider />
@@ -913,7 +1074,7 @@ function GenerationForm({
         disabled={context.isGenerating}
         onClick={() => void submitGenerationForm()}
       >
-        {context.isGenerating ? "Generando..." : "Generar"}
+        {context.isGenerating || isUploadingAssets ? "Generando..." : "Generar"}
       </Button>
       <Button variant="outlined" color="error" onClick={context.onCancel}>
         Cancelar

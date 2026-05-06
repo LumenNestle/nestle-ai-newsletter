@@ -8,7 +8,8 @@ export const BlockContentType = {
     SPECIAL: "SPECIAL",
 } as const;
 
-export type BlockContentType = (typeof BlockContentType)[keyof typeof BlockContentType];
+export type BlockContentType =
+    (typeof BlockContentType)[keyof typeof BlockContentType];
 
 export const BlockContentTypeLabel: Record<BlockContentType, string> = {
     [BlockContentType.LAYOUT]: "Estructural",

@@ -7,7 +7,6 @@ describe('AiController', () => {
   let controller: AiController;
   const aiService = {
     improveText: jest.fn(),
-    uploadAssets: jest.fn(),
     generateNewsletter: jest.fn(),
   };
 
@@ -47,11 +46,5 @@ describe('AiController', () => {
         assetIds: [],
       }),
     ).toThrow(UnauthorizedException);
-  });
-
-  it('rejects asset uploads without bearer authentication', () => {
-    expect(() => controller.uploadAssets(undefined, [])).toThrow(
-      UnauthorizedException,
-    );
   });
 });

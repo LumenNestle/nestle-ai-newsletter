@@ -1,11 +1,12 @@
 import { NestFactory } from '@nestjs/core';
+import { NestExpressApplication } from '@nestjs/platform-express';
 import { AppModule } from './app.module';
 
 const allowedOrigins = new Set(['https://nestle-ai-newsletter.vercel.app']);
 const localhostOriginPattern = /^http:\/\/(localhost|127\.0\.0\.1):\d+$/;
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
   app.enableCors({
     origin(

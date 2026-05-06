@@ -4,7 +4,7 @@
 
 These instructions apply to `backend`, a NestJS + TypeScript API.
 
-The backend owns business workflows, validation, authentication and authorization, Prisma data access, Supabase integration, newsletter export orchestration, and the Nestle GenIA/Cloudhub proxy.
+The backend owns business workflows, validation, authentication and authorization, Prisma data access, newsletter export orchestration, optional external storage integration, and the Nestle GenIA/Cloudhub proxy.
 
 Follow the root `AGENTS.md` first. This file adds backend-specific rules.
 

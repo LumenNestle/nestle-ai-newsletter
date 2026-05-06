@@ -28,7 +28,7 @@ import ViewQuiltOutlinedIcon from '@mui/icons-material/ViewQuiltOutlined'
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft'
 import ViewModuleOutlinedIcon from '@mui/icons-material/ViewModuleOutlined'
 import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined'
-import { improveText } from '../services/ai'
+import { improveText } from '../api/ai'
 
 interface Block {
   id: string

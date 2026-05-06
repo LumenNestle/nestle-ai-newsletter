@@ -128,13 +128,13 @@ const isAreaName = (value: unknown): value is AreaNameValue => {
 }
 
 const getUserArea = (user: User | null): AreaNameValue | null => {
-  const userWithArea: User & { area?: unknown } | null = user
+  const userArea = user?.area
 
-  if (!isAreaName(userWithArea?.area)) {
+  if (!isAreaName(userArea)) {
     return null
   }
 
-  return userWithArea.area
+  return userArea
 }
 
 export function ReviewsPage() {

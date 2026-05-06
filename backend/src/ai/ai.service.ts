@@ -6,7 +6,6 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { asset_type } from '@prisma/client';
 import { z } from 'zod';
 import {
   ImproveTextRequestDto,
@@ -17,46 +16,21 @@ import {
   GenerateNewsletterResponseDto,
   GeneratedNewsletterBlockDto,
 } from './dto/generate-newsletter.dto';
-import {
-  UploadedAiFile,
-  UploadAiAssetsResponseDto,
-} from './dto/upload-ai-asset.dto';
-import {
-  GeminiGenerateContentSuccess,
-  NestleGeniaGenerateContentSuccess,
-} from './ai.types';
-import { PrismaService } from '../prisma/prisma.service';
-import { SupabaseService } from '../supabase/supabase.service';
-
-type GenerateContentResponse =
-  | GeminiGenerateContentSuccess
-  | NestleGeniaGenerateContentSuccess;
+import { NestleGeniaGenerateContentSuccess } from './ai.types';
 
 @Injectable()
 export class AiService {
   private readonly logger = new Logger(AiService.name);
-  private readonly publicErrorMessage =
+  private readonly textImprovementPublicErrorMessage =
     'No se pudo mejorar el texto en este momento.';
-  private readonly generationPublicErrorMessage =
+  private readonly newsletterGenerationPublicErrorMessage =
     'No se pudo generar el newsletter en este momento.';
-  private readonly allowedAssetMimeTypes = new Set([
-    'image/jpeg',
-    'image/png',
-    'image/webp',
-    'image/gif',
-    'image/svg+xml',
-  ]);
-  private readonly maxAssetSizeBytes = 5 * 1024 * 1024;
   private readonly textImprovementInstruction =
     'You are a Spanish copy editor for internal Nestle newsletters. Improve the text for clarity, fluency, tone, and readability while keeping the original meaning. Return only the improved text in Spanish, with no markdown, bullets, or explanations.';
   private readonly defaultNestleGeniaUrl =
-    'https://eur-sdr-int-pub.nestle.com/api/dv-exp-sandbox-openai-api/1/genai/GCP/gemini-2.5-pro/generateContent';
+    'https://eur-sdr-int-pub.nestle.com/api/dv-exp-sandbox-openai-api/1/genai/GCP/gemini-2.0-flash-001/generateContent';
 
-  constructor(
-    private readonly configService: ConfigService,
-    private readonly prisma: PrismaService,
-    private readonly supabaseService: SupabaseService,
-  ) {}
+  constructor(private readonly configService: ConfigService) {}
 
   async improveText(
     request: ImproveTextRequestDto,
@@ -75,73 +49,17 @@ export class AiService {
       );
     }
 
-    if (this.readProvider() === 'nestle') {
-      return this.improveWithNestleGenia(originalText);
-    }
-
-    return this.improveWithGemini(originalText);
-  }
-
-  async uploadAssets(
-    files: UploadedAiFile[],
-  ): Promise<UploadAiAssetsResponseDto> {
-    try {
-      const assets = await Promise.all(
-        files.map(async (file) => {
-          this.validateAssetFile(file);
-
-          const uploadedAsset = await this.supabaseService.uploadAsset(
-            file.originalname,
-            file.buffer,
-            file.mimetype,
-          );
-
-          const asset = await this.prisma.assets.create({
-            data: {
-              name: file.originalname,
-              url: uploadedAsset.url,
-              type: asset_type.IMAGE,
-            },
-            select: {
-              id: true,
-              name: true,
-              url: true,
-              type: true,
-            },
-          });
-
-          return asset;
-        }),
-      );
-
-      return { assets };
-    } catch (error) {
-      if (error instanceof BadRequestException) {
-        throw error;
-      }
-
-      this.logger.error('AI asset upload failed.');
-
-      throw new ServiceUnavailableException(
-        'No se pudieron cargar los assets en este momento.',
-      );
-    }
+    return this.improveTextWithAi(originalText);
   }
 
   async generateNewsletter(
     request: GenerateNewsletterRequestDto,
   ): Promise<GenerateNewsletterResponseDto> {
     const prompt = this.buildNewsletterGenerationPrompt(request);
-    const providerResponse =
-      this.readProvider() === 'nestle'
-        ? await this.generateWithNestleGenia(prompt)
-        : await this.generateWithGemini(prompt);
-    const rawText = providerResponse.text;
+    const generatedText = await this.generateNewsletterWithAi(prompt);
 
     return {
-      blocks: this.parseGeneratedNewsletterBlocks(rawText),
-      provider: providerResponse.provider,
-      model: providerResponse.model,
+      blocks: this.parseGeneratedNewsletterBlocks(generatedText),
     };
   }
 
@@ -150,69 +68,49 @@ export class AiService {
     return value ? value : null;
   }
 
-  private readProvider(): 'gemini' | 'nestle' {
-    return this.readEnv('AI_PROVIDER')?.toLowerCase() === 'nestle'
-      ? 'nestle'
-      : 'gemini';
-  }
-
-  private async improveWithGemini(
+  private async improveTextWithAi(
     originalText: string,
   ): Promise<ImproveTextResponseDto> {
-    const apiKey = this.readEnv('GEMINI_API_KEY');
-    const model =
-      this.readEnv('GEMINI_MODEL') ??
-      this.readEnv('GEMINI_TEXT_MODEL') ??
-      'gemini-2.5-flash-lite';
-
-    if (!apiKey) {
-      throw new ServiceUnavailableException(
-        'Gemini is not configured on the server.',
-      );
-    }
-
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Accept: 'application/json',
-        },
-        body: JSON.stringify(this.buildGenerateContentPayload(originalText)),
-        signal: AbortSignal.timeout(15000),
-      },
+    const responseBody = await this.callAiProvider(
+      this.buildTextImprovementPayload(originalText),
+      this.textImprovementPublicErrorMessage,
+      'improveText',
     );
-
-    const responseBody = (await response
-      .json()
-      .catch(() => null)) as GeminiGenerateContentSuccess | null;
-
-    if (!response.ok) {
-      throw this.createProviderException(
-        'gemini',
-        response.status,
-        responseBody?.error?.message ??
-          `Gemini returned status ${response.status}.`,
-      );
-    }
 
     return {
       originalText,
-      improvedText: this.extractGeminiText(responseBody, model, 'gemini'),
-      provider: 'gemini',
-      model,
+      improvedText: this.extractNestleText(
+        responseBody,
+        this.extractNestleModelName(),
+        this.textImprovementPublicErrorMessage,
+        'improveText',
+      ),
     };
   }
 
-  private async improveWithNestleGenia(
-    originalText: string,
-  ): Promise<ImproveTextResponseDto> {
+  private async generateNewsletterWithAi(prompt: string): Promise<string> {
+    const responseBody = await this.callAiProvider(
+      this.buildNewsletterGenerateContentPayload(prompt),
+      this.newsletterGenerationPublicErrorMessage,
+      'generateNewsletter',
+    );
+
+    return this.extractNestleText(
+      responseBody,
+      this.extractNestleModelName(),
+      this.newsletterGenerationPublicErrorMessage,
+      'generateNewsletter',
+    );
+  }
+
+  private async callAiProvider(
+    payload: object,
+    publicMessage: string,
+    operation: 'improveText' | 'generateNewsletter',
+  ): Promise<NestleGeniaGenerateContentSuccess | null> {
     const clientId = this.readEnv('CLIENT_ID');
     const clientSecret = this.readEnv('CLIENT_SECRET');
     const url = this.readEnv('NESTLE_GENIA_URL') ?? this.defaultNestleGeniaUrl;
-    const model =
-      this.readEnv('NESTLE_GENIA_MODEL') ?? this.extractNestleModelFromUrl(url);
 
     if (!clientId || !clientSecret) {
       throw new ServiceUnavailableException(
@@ -228,8 +126,8 @@ export class AiService {
         'Content-Type': 'application/json',
         Accept: 'application/json',
       },
-      body: JSON.stringify(this.buildGenerateContentPayload(originalText)),
-      signal: AbortSignal.timeout(15000),
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(60000),
     });
 
     const responseBody = (await response
@@ -238,121 +136,17 @@ export class AiService {
 
     if (!response.ok) {
       throw this.createProviderException(
-        'nestle',
         response.status,
         this.extractNestleErrorMessage(responseBody, response.status),
+        publicMessage,
+        operation,
       );
     }
 
-    return {
-      originalText,
-      improvedText: this.extractGeminiText(responseBody, model, 'nestle'),
-      provider: 'nestle',
-      model,
-    };
+    return responseBody;
   }
 
-  private async generateWithGemini(prompt: string): Promise<{
-    text: string;
-    provider: 'gemini';
-    model: string;
-  }> {
-    const apiKey = this.readEnv('GEMINI_API_KEY');
-    const model =
-      this.readEnv('GEMINI_MODEL') ??
-      this.readEnv('GEMINI_TEXT_MODEL') ??
-      'gemini-2.5-flash-lite';
-
-    if (!apiKey) {
-      throw new ServiceUnavailableException(
-        'Gemini is not configured on the server.',
-      );
-    }
-
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Accept: 'application/json',
-        },
-        body: JSON.stringify(this.buildNewsletterGenerateContentPayload(prompt)),
-        signal: AbortSignal.timeout(15000),
-      },
-    );
-
-    const responseBody = (await response
-      .json()
-      .catch(() => null)) as GeminiGenerateContentSuccess | null;
-
-    if (!response.ok) {
-      throw this.createProviderException(
-        'gemini',
-        response.status,
-        responseBody?.error?.message ??
-          `Gemini returned status ${response.status}.`,
-        this.generationPublicErrorMessage,
-      );
-    }
-
-    return {
-      text: this.extractGeminiText(responseBody, model, 'gemini'),
-      provider: 'gemini',
-      model,
-    };
-  }
-
-  private async generateWithNestleGenia(prompt: string): Promise<{
-    text: string;
-    provider: 'nestle';
-    model: string;
-  }> {
-    const clientId = this.readEnv('CLIENT_ID');
-    const clientSecret = this.readEnv('CLIENT_SECRET');
-    const url = this.readEnv('NESTLE_GENIA_URL') ?? this.defaultNestleGeniaUrl;
-    const model =
-      this.readEnv('NESTLE_GENIA_MODEL') ?? this.extractNestleModelFromUrl(url);
-
-    if (!clientId || !clientSecret) {
-      throw new ServiceUnavailableException(
-        'Nestle GenIA is not configured on the server.',
-      );
-    }
-
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        client_id: clientId,
-        client_secret: clientSecret,
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-      },
-      body: JSON.stringify(this.buildNewsletterGenerateContentPayload(prompt)),
-      signal: AbortSignal.timeout(15000),
-    });
-
-    const responseBody = (await response
-      .json()
-      .catch(() => null)) as NestleGeniaGenerateContentSuccess | null;
-
-    if (!response.ok) {
-      throw this.createProviderException(
-        'nestle',
-        response.status,
-        this.extractNestleErrorMessage(responseBody, response.status),
-        this.generationPublicErrorMessage,
-      );
-    }
-
-    return {
-      text: this.extractGeminiText(responseBody, model, 'nestle'),
-      provider: 'nestle',
-      model,
-    };
-  }
-
-  private buildGenerateContentPayload(originalText: string): object {
+  private buildTextImprovementPayload(originalText: string): object {
     return {
       contents: [
         {
@@ -365,17 +159,11 @@ export class AiService {
         },
       ],
       generationConfig: {
-        temperature: 0.4,
+        temperature: 0.1,
         topP: 0.8,
-        topK: 40,
-        maxOutputTokens: 300,
+        topK: 20,
+        maxOutputTokens: 4000,
       },
-      safetySettings: [
-        {
-          category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT',
-          threshold: 'BLOCK_LOW_AND_ABOVE',
-        },
-      ],
     };
   }
 
@@ -394,15 +182,9 @@ export class AiService {
       generationConfig: {
         temperature: 0.5,
         topP: 0.8,
-        topK: 40,
-        maxOutputTokens: 900,
+        topK: 20,
+        maxOutputTokens: 4000,
       },
-      safetySettings: [
-        {
-          category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT',
-          threshold: 'BLOCK_LOW_AND_ABOVE',
-        },
-      ],
     };
   }
 
@@ -461,7 +243,7 @@ export class AiService {
       parsed = JSON.parse(jsonText) as unknown;
     } catch {
       throw new BadGatewayException({
-        message: this.generationPublicErrorMessage,
+        message: this.newsletterGenerationPublicErrorMessage,
       });
     }
 
@@ -469,7 +251,7 @@ export class AiService {
 
     if (!blockSchema.success) {
       throw new BadGatewayException({
-        message: this.generationPublicErrorMessage,
+        message: this.newsletterGenerationPublicErrorMessage,
       });
     }
 
@@ -483,27 +265,14 @@ export class AiService {
     return fencedJson?.[1]?.trim() ?? trimmedText;
   }
 
-  private validateAssetFile(file: UploadedAiFile): void {
-    if (!this.allowedAssetMimeTypes.has(file.mimetype)) {
-      throw new BadRequestException(
-        'Solo se permiten imagenes JPG, PNG, WebP, GIF o SVG.',
-      );
-    }
-
-    if (file.size > this.maxAssetSizeBytes) {
-      throw new BadRequestException(
-        'Cada archivo debe pesar 5 MB o menos.',
-      );
-    }
-
-    if (!file.buffer?.length) {
-      throw new BadRequestException('El archivo cargado esta vacio.');
-    }
-  }
-
   private extractNestleModelFromUrl(url: string): string {
     const match = url.match(/\/genai\/[^/]+\/([^/]+)\/generateContent$/);
-    return match?.[1] ?? 'gemini-2.5-pro';
+    return match?.[1] ?? 'gemini-2.0-flash-001';
+  }
+
+  private extractNestleModelName(): string {
+    const url = this.readEnv('NESTLE_GENIA_URL') ?? this.defaultNestleGeniaUrl;
+    return this.readEnv('NESTLE_GENIA_MODEL') ?? this.extractNestleModelFromUrl(url);
   }
 
   private extractNestleErrorMessage(
@@ -524,10 +293,11 @@ export class AiService {
     return `Nestle GenIA returned status ${responseStatus}.`;
   }
 
-  private extractGeminiText(
-    responseBody: GenerateContentResponse | null,
+  private extractNestleText(
+    responseBody: NestleGeniaGenerateContentSuccess | null,
     model: string,
-    provider: 'gemini' | 'nestle',
+    publicMessage: string,
+    operation: 'improveText' | 'generateNewsletter',
   ): string {
     const candidateText = responseBody?.candidates
       ?.flatMap((candidate) => candidate.content?.parts ?? [])
@@ -539,27 +309,28 @@ export class AiService {
     }
 
     throw this.createProviderException(
-      provider,
       502,
-      `${provider === 'nestle' ? 'Nestle GenIA' : 'Gemini'} model ${model} did not return any text content.`,
+      `Nestle GenIA model ${model} did not return any text content.`,
+      publicMessage,
+      operation,
     );
   }
 
   private createProviderException(
-    provider: 'gemini' | 'nestle',
     providerStatus: number,
     providerError: string,
-    publicMessage = this.publicErrorMessage,
+    publicMessage: string,
+    operation: 'improveText' | 'generateNewsletter',
   ): BadGatewayException {
     this.logger.error(
-      `AI improveText failed with provider=${provider} status=${providerStatus} error=${providerError}`,
+      `AI ${operation} failed with provider=nestle status=${providerStatus} error=${providerError}`,
     );
 
     return new BadGatewayException({
       message: publicMessage,
       providerError,
       providerStatus,
-      provider,
+      provider: 'nestle',
     });
   }
 }
