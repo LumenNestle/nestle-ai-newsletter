@@ -1,4 +1,5 @@
-export type BlockContentType = "example1" | "example2";
+export type BlockContentType = "LAYOUT" | "BASE" | "DIVIDER" | "CONTENT" | "SOCIAL" | "MULTIMEDIA" | "ICONS" | "SPECIAL";
+
 
 export interface BlockDefinitionDTO {
   type: BlockContentType;
