@@ -35,10 +35,14 @@ export type NewsletterTemplate = {
   optionalGenerationFields: TemplateGenerationField[]
 }
 
+export type ExportFormat =
+  | 'PNG'
+  | 'EML'
+
 export type ExportOption = {
   id: string
   label: string
-  format: 'PNG'
+  format: ExportFormat
 }
 
 // Modelo completo de Newsletter persistido

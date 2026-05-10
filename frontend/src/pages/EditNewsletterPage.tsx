@@ -5,11 +5,6 @@ import {
   Box,
   Button,
   CircularProgress,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogContentText,
-  DialogTitle,
   Stack,
   Tab,
   Tabs,
@@ -24,6 +19,7 @@ import { EditPanel } from '../components/newsletter/EditPanel'
 import { ReviewCommentControls } from '../components/newsletter/ReviewCommentControls'
 import { GenerationForm } from '../components/newsletter/GenerationForm'
 import type {
+  ExportFormat,
   ExportOption,
   Newsletter,
   NewsletterBlock,
@@ -34,6 +30,7 @@ import {
   generateNewsletter,
   type GenerateNewsletterRequest,
 } from '../api/ai'
+import { useNotification } from '../hooks/useNotification'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -60,11 +57,59 @@ async function renderNewsletterHtml(blocks: NewsletterBlock[]): Promise<string> 
 
 async function fetchExportOptions(): Promise<ExportOption[]> {
   await new Promise<void>((r) => window.setTimeout(r, 150))
-  return [{ id: 'png', label: 'Exportar a PNG', format: 'PNG' }]
+  return [
+    {
+      id: 'png',
+      label: 'Exportar a PNG',
+      format: 'PNG',
+    },
+    {
+      id: 'eml',
+      label: 'Exportar a EML',
+      format: 'EML',
+    },
+  ]
 }
 
 async function exportHtmlToPng(): Promise<void> {
   await new Promise<void>((r) => window.setTimeout(r, 250))
+}
+
+async function exportHtmlToEml(
+  html: string,
+): Promise<void> {
+  const emlContent = [
+    'X-Unsent: 1',
+    'To: ',
+    'Subject: Newsletter Nestlé',
+    'MIME-Version: 1.0',
+    'Content-Type: text/html; charset=UTF-8',
+    'Content-Transfer-Encoding: 8bit',
+    '',
+    html,
+  ].join('\r\n')
+
+  const blob = new Blob(
+    [emlContent],
+    {
+      type: 'message/rfc822',
+    },
+  )
+
+  const url =
+    URL.createObjectURL(blob)
+
+  const link =
+    document.createElement('a')
+
+  link.href = url
+  link.download = 'newsletter.eml'
+
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+
+  URL.revokeObjectURL(url)
 }
 
 // ⚠️ ARREGLAR ⚠️ — reemplazar por improveText({ text }) de la API real
@@ -106,12 +151,13 @@ function requestToFormValues(req: GenerateNewsletterRequest) {
   }
 }
 
-// ── EditPage ──────────────────────────────────────────────────────────────────
+// ── EditNewsletterPage ──────────────────────────────────────────────────────────────────
 
-function EditPage() {
+function EditNewsletterPage() {
   const navigate = useNavigate()
   const { id: newsletterId } = useParams<{ id: string }>()
   const { user } = useAuth()
+  const { success: notifySuccess } = useNotification()
 
   const currentUserId: string = user?.id ?? 'anonymous'
   const currentUserRole: UserRole = user?.role ?? 'USER'
@@ -124,12 +170,11 @@ function EditPage() {
   const [selectedBlockId, setSelectedBlockId] = useState('')
   const [exportOptions, setExportOptions] = useState<ExportOption[]>([])
   const [isRenderingHtml, setIsRenderingHtml] = useState(false)
-  const [isExportingPng, setIsExportingPng] = useState(false)
+  const [exportingFormat, setExportingFormat,] = useState<ExportFormat | null>(null)
   const [isSendingForReview, setIsSendingForReview] = useState(false)
   const [regeneratingBlockId, setRegeneratingBlockId] = useState<string | null>(null)
   const [isRegeneratingAll, setIsRegeneratingAll] = useState(false)
   const [showRegenerationForm, setShowRegenerationForm] = useState(false)
-  const [showSuccessModal, setShowSuccessModal] = useState(false)
   const [aiError, setAiError] = useState<string | null>(null)
 
   // ── Fetch newsletter ──
@@ -251,18 +296,34 @@ function EditPage() {
   }, [handleRenderHtml, newsletter?.state])
 
   // ── Actions ──
-  const handleSendForReview = useCallback(async () => {
-    setIsSendingForReview(true)
-    try {
-      await handleRenderHtml()
-      await transitionState('IN_REVIEW')
-      setShowSuccessModal(true)
-    } catch {
-      setAiError('No se pudo enviar a revisión. Intenta de nuevo.')
-    } finally {
-      setIsSendingForReview(false)
-    }
-  }, [handleRenderHtml, transitionState])
+  const handleSendForReview =
+    useCallback(async () => {
+      setIsSendingForReview(true)
+
+      try {
+        await handleRenderHtml()
+
+        await transitionState(
+          'IN_REVIEW',
+        )
+
+        notifySuccess(
+          'Newsletter enviado con éxito',
+        )
+
+        navigate('/dashboard')
+      } catch {
+        setAiError(
+          'No se pudo enviar a revisión. Intenta de nuevo.',
+        )
+      } finally {
+        setIsSendingForReview(false)
+      }
+    }, [
+      handleRenderHtml,
+      navigate,
+      transitionState,
+    ])
 
   const handleRegenerateBlock = useCallback(
     async (blockId: string) => {
@@ -336,14 +397,57 @@ function EditPage() {
     if (currentUserId !== newsletter?.creatorUserId) navigate('/dashboard')
   }, [currentUserId, navigate, newsletter?.creatorUserId, transitionState])
 
-  const handleExportToPng = useCallback(async () => {
-    setIsExportingPng(true)
-    try {
-      await exportHtmlToPng()
-    } finally {
-      setIsExportingPng(false)
-    }
-  }, [])
+  const handleExportToPng =
+    useCallback(async () => {
+      setExportingFormat('PNG')
+
+      try {
+        await exportHtmlToPng()
+      } finally {
+        setExportingFormat(null)
+      }
+    }, [])
+
+  const handleExportToEml =
+    useCallback(async () => {
+      setExportingFormat('EML')
+
+      try {
+        const html =
+          newsletter?.renderedHtml ||
+          fallbackHtml
+
+        await exportHtmlToEml(html)
+      } finally {
+        setExportingFormat(null)
+      }
+    }, [newsletter])
+
+  const handleExport =
+    useCallback(
+      async (
+        format: ExportFormat,
+      ) => {
+        switch (format) {
+          case 'PNG':
+            await handleExportToPng()
+            break
+
+          case 'EML':
+            await handleExportToEml()
+            break
+
+          default:
+            console.warn(
+              `Formato no soportado: ${format}`,
+            )
+        }
+      },
+      [
+        handleExportToPng,
+        handleExportToEml,
+      ],
+    )
 
   const handleCancel = useCallback(async () => {
     await transitionState('DISCARDED')
@@ -465,12 +569,19 @@ function EditPage() {
           <Button
             key={opt.id}
             variant="contained"
-            disabled={isExportingPng}
-            onClick={() => {
-              if (opt.format === 'PNG') void handleExportToPng()
-            }}
+            disabled={
+              exportingFormat !== null
+            }
+            onClick={() =>
+              void handleExport(
+                opt.format,
+              )
+            }
           >
-            {isExportingPng ? 'Exportando...' : opt.label}
+            {exportingFormat ===
+              opt.format
+              ? 'Exportando...'
+              : opt.label}
           </Button>
         ))}
       </Stack>,
@@ -577,26 +688,7 @@ function EditPage() {
         ) : null}
       </>
     )
-
-  return (
-    <>
-      {pageLayout(leftPane, rightPane)}
-      <Dialog open={showSuccessModal} onClose={() => setShowSuccessModal(false)}>
-        <DialogTitle>Newsletter enviado a revisión</DialogTitle>
-        <DialogContent>
-          <DialogContentText>Tu newsletter fue enviado correctamente. ¿Qué querés hacer ahora?</DialogContentText>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => navigate('/dashboard')} color="inherit">
-            Ir al inicio
-          </Button>
-          <Button onClick={() => navigate('/crearNewsletter')} variant="contained">
-            Crear otro
-          </Button>
-        </DialogActions>
-      </Dialog>
-    </>
-  )
+  return pageLayout(leftPane, rightPane)
 }
 
-export default EditPage
+export default EditNewsletterPage

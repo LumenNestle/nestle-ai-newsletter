@@ -10,7 +10,7 @@ import { apiBaseUrl } from './config/api'
 import { LoginPage } from './pages/LoginPage'
 import { DashboardPage } from './pages/DashboardPage'
 import CreatePage from './pages/CreatePage'
-import { EditPage } from './pages/EditPage'
+import { EditTemplatePage } from './pages/EditTemplatePage'
 import TemplatesPage from './pages/TemplatesPage'
 import { AnalyticsPage } from './pages/AnalyticsPage'
 import { ReviewsPage } from './pages/ReviewsPage'
@@ -734,7 +734,7 @@ function AppRouter() {
             element={
               <ProtectedRoute>
                 <ProtectedLayout>
-                  <EditPage />
+                  <EditTemplatePage />
                 </ProtectedLayout>
               </ProtectedRoute>
             }

@@ -59,7 +59,7 @@ function CreatePage() {
           generationRequest: request,
         })
 
-        // 3. Navegar a EditPage con el ID
+        // 3. Navegar a EditNewsletterPage con el ID
         navigate(`/editarNewsletter/${newsletter.id}`)
       } catch (error) {
         console.error('Error al generar newsletter:', error)

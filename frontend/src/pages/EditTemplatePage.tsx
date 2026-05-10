@@ -208,7 +208,7 @@ function EmailBlockPreview({
   )
 }
 
-export function EditPage() {
+export function EditTemplatePage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
 
