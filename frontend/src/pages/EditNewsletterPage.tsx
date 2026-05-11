@@ -517,17 +517,10 @@ function EditNewsletterPage() {
           <Button
             key={opt.id}
             variant="contained"
-            disabled={
-              exportingFormat !== null
-            }
-            onClick={() =>
-              void handleExport(
-                opt.format,
-              )
-            }
-          >
-            {exportingFormat ===
-              opt.format
+            disabled={ exportingFormat !== null}
+            onClick={() => void handleExport( opt.format,)}
+            >
+            {exportingFormat === opt.format
               ? 'Exportando...'
               : opt.label}
           </Button>
