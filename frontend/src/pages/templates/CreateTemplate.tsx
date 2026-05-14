@@ -130,7 +130,7 @@ export function CreateTemplate() {
               }}
             >
               {TAB_LABELS.map((label: string, i: number) => (
-                <Tab key={label} label={label} value={i} />
+                <Tab key={label} label={label} value={i} disabled={isSkeletonView && i === 1} />
               ))}
             </Tabs>
           </Box>
@@ -138,15 +138,8 @@ export function CreateTemplate() {
             {activeTab === 0 && (
               <StructureControl onConfirm={handleConfirmStructure} />
             )}
-            {activeTab === 1 && (
+            {activeTab === 1 &&  (
               <EditorControl />
-            )}
-            {activeTab === 2 && (
-              <Box sx={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Typography variant="body2" color="text.disabled">
-                  Flujo de revisión — próximamente
-                </Typography>
-              </Box>
             )}
           </Box>
           <Box

@@ -58,10 +58,7 @@ export const EditorControl: React.FC = () => {
   }
   return (
     <Stack spacing={3}>
-      <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
-        EDITAR BLOQUE
-      </Typography>
-      <Stack spacing={3}>
+      <Stack spacing={1}>
         <Box>
           <Box
             sx={{
@@ -70,38 +67,6 @@ export const EditorControl: React.FC = () => {
               gap: 1.5,
             }}
           >
-            <Box
-              onClick={() => selectedRow && updateColumnBlock(selectedRow.id, selectedCol.id, null)}
-              sx={{
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                border: '1px solid',
-                borderColor: 'divider',
-                borderRadius: 1,
-                cursor: 'pointer',
-                transition: 'all 0.2s ease-in-out',
-                p: 1,
-                maxWidth: '75px',
-                '&:hover': {
-                  bgcolor: 'error.lighter',
-                  borderColor: 'error.main',
-                }
-              }}
-            >
-              <Typography
-                variant="caption"
-                sx={{
-                  fontWeight: 600,
-                  fontSize: '0.65rem',
-                  color: 'error.main',
-                  textAlign: 'center'
-                }}
-              >
-                Quitar bloque
-              </Typography>
-            </Box>
           </Box>
         </Box>
         {Object.entries(groupedDefinitions).map(([type, blocks]) => (

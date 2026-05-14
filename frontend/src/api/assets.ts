@@ -24,12 +24,9 @@ export async function listAssets(
 ): Promise<UploadAssetsResponse> {
   const response = await axios.get<UploadAssetsResponse>('/assets', {
     params: type ? { type } : undefined,
-<<<<<<< HEAD
     headers: {
       'Content-Type': 'multipart/form-data',
     }
-=======
->>>>>>> origin/staging
   })
 
   return response.data

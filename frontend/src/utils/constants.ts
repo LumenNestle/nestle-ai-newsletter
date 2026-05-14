@@ -16,4 +16,4 @@ export const TYPE_LABELS: Record<string, string> = {
   SPECIAL: 'ESPECIALES'
 };
 
-export const TAB_LABELS: string[] = ['Crear', 'Editar', 'Revisar']
+export const TAB_LABELS: string[] = ['Crear', 'Editar']

@@ -28,7 +28,13 @@ export const useTemplateStore = create<TemplateStore>((set, get) => ({
   title: 'Nuevo Template',
   layoutMode: 'PORTRAIT',
   isSkeletonView: true,
-  rows: [],
+  rows: [
+    {
+      id: uuidv4(),
+      rowIndex: 0,
+      columns: [{ id: uuidv4(), type: null, content: null, mustFill: false, displayOrder: 0 }]
+    }
+  ],
   selectedBlockId: null,
 
   setMode: (mode) => {
@@ -116,7 +122,13 @@ export const useTemplateStore = create<TemplateStore>((set, get) => ({
     title: 'Nuevo Template',
     layoutMode: 'PORTRAIT',
     isSkeletonView: true,
-    rows: [],
+    rows: [
+      {
+        id: uuidv4(),
+        rowIndex: 0,
+        columns: [{ id: uuidv4(), type: null, content: null, mustFill: false, displayOrder: 0 }]
+      }
+    ],
     selectedBlockId: null,
     ...initialData
   }),
