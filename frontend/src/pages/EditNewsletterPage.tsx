@@ -18,6 +18,8 @@ import { EditPanel } from "../components/newsletter/EditPanel";
 import { ReviewCommentControls } from "../components/newsletter/ReviewCommentControls";
 import { GenerationForm } from "../components/newsletter/GenerationForm";
 import { BrandKitResourcesPanel } from "../components/newsletter/BrandKitResourcesPanel";
+import NewsletterStepper from '../components/newsletter/NewsletterStepper'
+
 import type {
   NewsletterAssetSelection,
   ExportFormat,
@@ -544,47 +546,54 @@ function EditNewsletterPage() {
   // ──────────────────────────────────────────────────────────────────────────
 
   const pageLayout = (left: React.ReactNode, right: React.ReactNode) => (
-    <Box
-      component="main"
-      sx={{
-        minHeight: "calc(100vh - 64px)",
-        bgcolor: "background.default",
-        display: "grid",
-        gridTemplateColumns: {
-          xs: "1fr",
-          lg: "minmax(0, 1fr) minmax(380px, 0.72fr)",
-        },
-      }}
-    >
+    <>
+      <NewsletterStepper
+        activeStep={1}
+        newsletterId={newsletterId}
+        userRole={currentUserRole}
+      />      
       <Box
+        component="main"
         sx={{
-          p: { xs: 2, md: 3 },
-          borderRight: { lg: "1px solid" },
-          borderBottom: { xs: "1px solid", lg: "none" },
-          borderColor: "divider",
-          minWidth: 0,
+          minHeight: "calc(100vh - 64px)",
+          bgcolor: "background.default",
+          display: "grid",
+          gridTemplateColumns: {
+            xs: "1fr",
+            lg: "minmax(0, 1fr) minmax(380px, 0.72fr)",
+          },
         }}
       >
-        {left}
-      </Box>
-      <Box sx={{ p: { xs: 2, md: 3 }, minWidth: 0 }}>
-        <Stack spacing={2}>
-          <Stack spacing={0.75}>
-            <Typography variant="overline">
-              Estado: {newsletter?.state}
-            </Typography>
-            <Typography variant="h4">Builder de newsletter</Typography>
-            {newsletter && selectedTemplate && (
-              <Typography variant="body2" color="text.secondary">
-                Plantilla: {selectedTemplate.name} · BrandKit:{" "}
-                {selectedBrandKitLabel}
+        <Box
+          sx={{
+            p: { xs: 2, md: 3 },
+            borderRight: { lg: "1px solid" },
+            borderBottom: { xs: "1px solid", lg: "none" },
+            borderColor: "divider",
+            minWidth: 0,
+          }}
+        >
+          {left}
+        </Box>
+        <Box sx={{ p: { xs: 2, md: 3 }, minWidth: 0 }}>
+          <Stack spacing={2}>
+            <Stack spacing={0.75}>
+              <Typography variant="overline">
+                Estado: {newsletter?.state}
               </Typography>
-            )}
+              <Typography variant="h4">Builder de newsletter</Typography>
+              {newsletter && selectedTemplate && (
+                <Typography variant="body2" color="text.secondary">
+                  Plantilla: {selectedTemplate.name} · BrandKit:{" "}
+                  {selectedBrandKitLabel}
+                </Typography>
+              )}
+            </Stack>
+            {right}
           </Stack>
-          {right}
-        </Stack>
+        </Box>
       </Box>
-    </Box>
+    </>  
   );
 
   // ── Loading ──

@@ -15,6 +15,7 @@ import type {
 } from '../types/newsletter'
 import { createNewsletter } from '../api/newsletters'
 import { listTemplates } from '../api/templates'
+import NewsletterStepper from '../components/newsletter/NewsletterStepper'
 
 // Mocks hardcodeados
 /*function buildMockBlocks(request: GenerateNewsletterRequest): NewsletterBlock[] {
@@ -124,52 +125,60 @@ function CreateNewsletterPage() {
   }
 
   return (
-    <Box
-      component="main"
-      sx={{
-        minHeight: 'calc(100vh - 64px)',
-        bgcolor: 'background.default',
-        display: 'grid',
-        gridTemplateColumns: { xs: '1fr', lg: 'minmax(0, 1fr) minmax(380px, 0.72fr)' },
-      }}
-    >
+    <>
+      <NewsletterStepper
+        activeStep={0}
+        newsletterId={undefined}
+        userRole={user?.role ?? 'USER'}
+      />
+
       <Box
+        component="main"
         sx={{
-          p: { xs: 2, md: 3 },
-          borderRight: { lg: '1px solid' },
-          borderBottom: { xs: '1px solid', lg: 'none' },
-          borderColor: 'divider',
-          minWidth: 0,
+          minHeight: 'calc(100vh - 64px)',
+          bgcolor: 'background.default',
+          display: 'grid',
+          gridTemplateColumns: { xs: '1fr', lg: 'minmax(0, 1fr) minmax(380px, 0.72fr)' },
         }}
       >
-        <TemplateCarousel
-          templates={templates}
-          selectedBrandKitId={selectedBrandKitId}
-          onSelectTemplate={setSelectedTemplateId}
-          onSelectBrandKit={setSelectedBrandKitId}
-        />
-      </Box>
+        <Box
+          sx={{
+            p: { xs: 2, md: 3 },
+            borderRight: { lg: '1px solid' },
+            borderBottom: { xs: '1px solid', lg: 'none' },
+            borderColor: 'divider',
+            minWidth: 0,
+          }}
+        >
+          <TemplateCarousel
+            templates={templates}
+            selectedBrandKitId={selectedBrandKitId}
+            onSelectTemplate={setSelectedTemplateId}
+            onSelectBrandKit={setSelectedBrandKitId}
+          />
+        </Box>
 
-      <Box sx={{ p: { xs: 2, md: 3 }, minWidth: 0 }}>
-        <Stack spacing={2}>
-          <Typography variant="h4">Crear newsletter</Typography>
-          {templatesError && <Alert severity="error">{templatesError}</Alert>}
-          {!templatesError && templates.length === 0 && (
-            <Alert severity="info">No hay plantillas disponibles en este momento.</Alert>
-          )}
-          {selectedTemplate && selectedBrandKitId && (
-            <GenerationForm
-              selectedTemplate={selectedTemplate}
-              selectedBrandKitId={selectedBrandKitId}
-              isGenerating={isGenerating}
-              aiError={aiError}
-              onGenerate={handleGenerate}
-              onCancel={() => navigate('/dashboard')}
-            />
-          )}
-        </Stack>
+        <Box sx={{ p: { xs: 2, md: 3 }, minWidth: 0 }}>
+          <Stack spacing={2}>
+            <Typography variant="h4">Crear newsletter</Typography>
+            {templatesError && <Alert severity="error">{templatesError}</Alert>}
+            {!templatesError && templates.length === 0 && (
+              <Alert severity="info">No hay plantillas disponibles en este momento.</Alert>
+            )}
+            {selectedTemplate && selectedBrandKitId && (
+              <GenerationForm
+                selectedTemplate={selectedTemplate}
+                selectedBrandKitId={selectedBrandKitId}
+                isGenerating={isGenerating}
+                aiError={aiError}
+                onGenerate={handleGenerate}
+                onCancel={() => navigate('/dashboard')}
+              />
+            )}
+          </Stack>
+        </Box>
       </Box>
-    </Box>
+    </>  
   )
 }
 
