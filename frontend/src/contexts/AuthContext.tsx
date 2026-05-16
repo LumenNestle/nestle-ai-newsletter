@@ -27,6 +27,9 @@ interface StoredSession {
   refreshToken: string;
   accessTokenExpiresAt: number;
   refreshTokenExpiresAt: number;
+  "x-user-id": string;
+  "x-user-role": UserRole;
+  "x-area": string;
 }
 
 export interface AuthContextType {
@@ -41,7 +44,7 @@ export interface AuthContextType {
 
 export const MICROSOFT_SSO_USERS: User[] = [
   {
-    id: "1",
+    id: crypto.randomUUID(),
     email: "superadmin@example.com",
     name: "Administrador",
     role: "ADMIN",
@@ -49,20 +52,20 @@ export const MICROSOFT_SSO_USERS: User[] = [
     state: "ACTIVE",
   },
   {
-    id: "2",
+    id: "a1e21954-62ea-4e65-a2f1-97d27fd1c9c7",
     email: "funcional@example.com",
     name: "Funcional",
     role: "FUNCTIONAL",
     state: "ACTIVE",
-    area: "COMUNICACION_CORPORATIVA",
+    area: "COMUNICACION_INTERNA",
   },
   {
-    id: "3",
+    id: "17b864c8-c286-46f5-8119-272d915e2247",
     email: "user@example.com",
     name: "Usuario Normal",
     role: "USER",
-    state: "INACTIVE",
-    area: "COMUNICACION_INTERNA",
+    state: "ACTIVE",
+    area: "COMUNICACION_CORPORATIVA",
   },
 ];
 
@@ -93,6 +96,9 @@ const createMockSession = (user: User): StoredSession => {
     refreshToken: `ms_refresh_${user.id}_${now}`,
     accessTokenExpiresAt: now + ACCESS_TOKEN_TTL,
     refreshTokenExpiresAt: now + REFRESH_TOKEN_TTL,
+    "x-user-id": user.id,
+    "x-user-role": user.role,
+    "x-area": user.area || "",
   };
 };
 
@@ -141,16 +147,29 @@ const clearStoredSession = () => {
   localStorage.removeItem(SESSION_STORAGE_KEY);
 };
 
-const setAxiosSessionHeaders = (session?: StoredSession) => {
+const setAxiosHeaders = (session?: StoredSession) => {
   if (session) {
     axios.defaults.headers.common.Authorization = `Bearer ${session.accessToken}`;
-    axios.defaults.headers.common["x-user-id"] = session.user.id;
-    axios.defaults.headers.common["x-user-role"] = session.user.role;
-    axios.defaults.headers.common["x-area"] = session.user.area;
+    axios.defaults.headers.common["x-user-id"] = session["x-user-id"];
+    axios.defaults.headers.common["x-user-role"] = session["x-user-role"];
+    axios.defaults.headers.common["x-area"] = session["x-area"];
     return;
   }
 
   delete axios.defaults.headers.common.Authorization;
+  delete axios.defaults.headers.common["x-user-id"];
+  delete axios.defaults.headers.common["x-user-role"];
+  delete axios.defaults.headers.common["x-area"];
+};
+
+const setAxiosMockHeaders = (user?: User) => {
+  if (user) {
+    axios.defaults.headers.common["x-user-id"] = user.id;
+    axios.defaults.headers.common["x-user-role"] = user.role;
+    axios.defaults.headers.common["x-area"] = user.area ?? "";
+    return;
+  }
+
   delete axios.defaults.headers.common["x-user-id"];
   delete axios.defaults.headers.common["x-user-role"];
   delete axios.defaults.headers.common["x-area"];
@@ -162,13 +181,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const commitSession = useCallback((session: StoredSession) => {
     saveStoredSession(session);
-    setAxiosSessionHeaders(session);
+    setAxiosHeaders(session);
     setUser(session.user);
   }, []);
 
   const logout = useCallback(() => {
     clearStoredSession();
-    setAxiosSessionHeaders();
+    setAxiosHeaders();
     setUser(null);
   }, []);
 
@@ -194,7 +213,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       clearStoredSession();
-      setAxiosSessionHeaders();
+      setAxiosHeaders();
       setLoading(false);
     }, 0);
 
