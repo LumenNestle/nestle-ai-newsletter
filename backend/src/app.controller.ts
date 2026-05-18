@@ -19,21 +19,4 @@ export class AppController {
     return this.appService.getHealth();
   }
 
-  @Get('prisma-test')
-  async testPrismaConnection() {
-    try {
-      const areas = await this.prisma.areas.findMany();
-
-      return {
-        ok: true,
-        count: areas.length,
-        areas,
-      };
-    } catch (error) {
-      return {
-        ok: false,
-        error: error instanceof Error ? error.message : 'Unknown Prisma error',
-      };
-    }
-  }
 }

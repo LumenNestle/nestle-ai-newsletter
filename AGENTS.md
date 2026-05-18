@@ -90,9 +90,9 @@ Use Spanish labels in the UI when displaying enum values. Keep enum identifiers 
 - Do not trust client-provided roles, user IDs, approval states, permissions, export ownership, or tenant boundaries.
 - Authorization must be enforced in the backend. Frontend checks are only UX hints.
 - Backend endpoints are private by default.
-- New backend endpoints must require an authenticated Supabase or Azure AD session unless the task explicitly defines them as public.
+- New backend endpoints must require an authenticated application session unless the task explicitly defines them as public.
 - Public endpoints must be rare, documented in code, and limited to safe cases such as health checks or deliberately public static assets.
-- Do not expose `.env` values, credentials, API keys, Supabase keys, AI credentials, `CLIENT_ID`, or `CLIENT_SECRET` in logs, client bundles, HTTP responses, exports, or generated files.
+- Do not expose `.env` values, credentials, API keys, storage provider keys, AI credentials, `CLIENT_ID`, or `CLIENT_SECRET` in logs, client bundles, HTTP responses, exports, or generated files.
 - Do not interpolate untrusted values into SQL, shell commands, file paths, generated HTML, MJML, PDFs, logs, prompts, or external URLs.
 - Use allowlists for CORS origins, upload file types, export formats, AI destinations, and external links.
 - Error responses must be useful but generic. Do not return stack traces, internal provider details, SQL errors, tokens, or secrets.

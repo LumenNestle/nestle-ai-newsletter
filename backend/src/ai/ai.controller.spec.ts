@@ -1,13 +1,13 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { UnauthorizedException } from '@nestjs/common';
+import { GUARDS_METADATA } from '@nestjs/common/constants';
 import { AiController } from './ai.controller';
 import { AiService } from './ai.service';
+import { MockAuthGuard } from '../modules/auth/guards/mockup.guard';
 
 describe('AiController', () => {
   let controller: AiController;
   const aiService = {
     improveText: jest.fn(),
-    uploadAssets: jest.fn(),
     generateNewsletter: jest.fn(),
   };
 
@@ -33,25 +33,33 @@ describe('AiController', () => {
     expect(controller).toBeDefined();
   });
 
-  it('rejects generate newsletter requests without bearer authentication', () => {
-    expect(() =>
-      controller.generateNewsletter(undefined, {
-        area: 'COMUNICACION_INTERNA',
-        templateId: 'weekly-brief',
-        topic: 'Tema',
-        objective: 'Objetivo',
-        audience: 'Audiencia',
-        keyMessages: ['Mensaje'],
-        tone: 'Cercano',
-        linksOrSources: [],
-        assetIds: [],
-      }),
-    ).toThrow(UnauthorizedException);
+  it('applies MockAuthGuard at controller level', () => {
+    const guards = Reflect.getMetadata(GUARDS_METADATA, AiController) as Array<
+      new (...args: unknown[]) => unknown
+    >;
+
+    expect(guards).toContain(MockAuthGuard);
   });
 
-  it('rejects asset uploads without bearer authentication', () => {
-    expect(() => controller.uploadAssets(undefined, [])).toThrow(
-      UnauthorizedException,
-    );
+  it('delegates generate newsletter requests to the service', async () => {
+    const body = {
+      area: 'COMUNICACION_INTERNA' as const,
+      templateId: 'weekly-brief',
+      brandKitId: 'nestle-corporate',
+      topic: 'Tema',
+      objective: 'Objetivo',
+      audience: 'Audiencia',
+      keyMessages: ['Mensaje'],
+      tone: 'Cercano',
+      linksOrSources: [],
+      assetIds: [],
+    };
+
+    aiService.generateNewsletter.mockResolvedValue({ blocks: [] });
+
+    await expect(controller.generateNewsletter(body)).resolves.toEqual({
+      blocks: [],
+    });
+    expect(aiService.generateNewsletter).toHaveBeenCalledWith(body);
   });
 });

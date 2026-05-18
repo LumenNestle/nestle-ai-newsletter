@@ -14,8 +14,10 @@
 
     "verbatimModuleSyntax": true,
     "moduleDetection": "force",
+    "allowImportingTsExtensions": true,
 
     "forceConsistentCasingInFileNames": true
   },
-  "include": ["src/**/*.ts", "src/**/*.d.ts", "src/**/*.tsx"]
+  "include": ["src/**/*.ts", "src/**/*.d.ts", "src/**/*.tsx"],
+  "references": [{ "path": "../packages/shared/tsconfig.json" }]
 }

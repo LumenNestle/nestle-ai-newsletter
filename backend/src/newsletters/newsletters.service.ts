@@ -1,5 +1,8 @@
-import { Injectable } from '@nestjs/common';
+import {Injectable, NotFoundException, BadRequestException} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import type { UpdateNewsletterStatusBody } from './newsletters.schemas';
+import { newsletter_state } from '@prisma/client';
+import { validateNewsletterStateLogTransition } from './validators/newsletter.validator';
 
 @Injectable()
 export class NewsLettersService {
@@ -51,16 +54,64 @@ export class NewsLettersService {
     return 'Desde delete newsletters con ID' + id;
   }
 
-  updateStatus(id: string) {
-    return 'Desde update status newsletters con ID' + id;
+  async updateStatus(id: string, body: UpdateNewsletterStatusBody) {
+    const newsletter = await this.prisma.newsletters.findUnique({
+      where: { id },
+    });
+    if (!newsletter)
+      throw new NotFoundException(`Newsletter ${id} no encontrado`);
+
+    const [updated] = await Promise.all([
+      this.prisma.newsletters.update({
+        where: { id },
+        data: { state: body.state },
+      }),
+      this.prisma.newsletter_state_log.create({
+        data: {
+          newsletter_id: id,
+          previous_state: body.previousState ?? newsletter.state,
+          new_state: body.state,
+          reviewed_by_user_id: body.reviewedByUserId ?? null,
+          all_commentaries: body.allCommentaries ?? null,
+        },
+      }),
+    ]);
+
+    return updated;
   }
 
   getLogs(id: string) {
     return 'Desde logs newsletters con ID' + id;
   }
 
-  addLog(id: string) {
-    return 'Desde add log newsletters con ID' + id;
+  async addLog(
+    id: string,
+    logData: {
+      previousState?: newsletter_state;
+      newState?: newsletter_state;
+      reviewedByUserId?: string;
+      allCommentaries?: string;
+    },
+  ) {
+    const newsletter = await this.prisma.newsletters.findUnique({
+      where: { id },
+    });
+
+    if (!newsletter) {
+      throw new BadRequestException('Newsletter no encontrada');
+    }
+
+    validateNewsletterStateLogTransition(newsletter.state, logData);
+
+    return this.prisma.newsletter_state_log.create({
+      data: {
+        newsletter_id: id,
+        previous_state: logData.previousState,
+        new_state: logData.newState,
+        reviewed_by_user_id: logData.reviewedByUserId,
+        all_commentaries: logData.allCommentaries,
+      },
+    });
   }
 
   getComments(id: string) {
@@ -80,6 +131,6 @@ export class NewsLettersService {
   }
 
   getExports(id: string) {
-    return `Desde exports newsletters con ID ${id}`;
+    return `Desde export newsletter con ID ${id}`;
   }
 }

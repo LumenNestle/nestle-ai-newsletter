@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Box,
   Button,
@@ -25,6 +25,8 @@ import {
 import { ModalDelete } from '../ModalDelete';
 import { TableSortLabel } from '@mui/material';
 import Tooltip from "@mui/material/Tooltip";
+import { useNavigate } from 'react-router';
+import { getAllNewsletters } from '../../api/newsletters';
 
 interface NewsletterRow {
   id: string;
@@ -65,114 +67,12 @@ const getStatusColor = (status: NewsletterStatus) => {
 };
 
 
-const mockNewsletters: NewsletterRow[] = [
-  {
-    id: '1',
-    title: 'Newsletter 1',
-    autor: 'autor 1',
-    state: NewsletterStatus.IN_REVIEW,
-    language: 'English',
-    reviewer: 'revisor 1',
-    publish_date: '01-10-2023',
-    updated_at: '30-09-2023',
-  },
-  {
-    id: '2',
-    title: 'Newsletter 2',
-    autor: 'autor 2',
-    state: NewsletterStatus.APPROVED,
-    language: 'Spanish',
-    reviewer: 'admin',
-    publish_date: '02-10-2023',
-    updated_at: '30-09-2023',
-  },
-  {
-    id: '3',
-    title: 'Newsletter 3',
-    autor: 'autor 3',
-    state: NewsletterStatus.CHANGES_REQUESTED,
-    language: 'French',
-    reviewer: 'revisor 2',
-    publish_date: '03-10-2023',
-    updated_at: '28-09-2023',
-  },
-  {
-    id: '4',
-    title: 'Newsletter 4',
-    autor: 'autor 4',
-    state: NewsletterStatus.DRAFT,
-    language: 'English',
-    reviewer: 'admin',
-    publish_date: null,
-    updated_at: '27-09-2023',
-  },
-  {
-    id: '5',
-    title: 'Newsletter 5',
-    autor: 'autor 2',
-    state: NewsletterStatus.RESUBMITTED,
-    language: 'Spanish',
-    reviewer: 'revisor 3',
-    publish_date: '04-10-2023',
-    updated_at: '26-09-2023',
-  },
-  {
-    id: '6',
-    title: 'Newsletter 6',
-    autor: 'autor 1',
-    state: NewsletterStatus.APPROVED,
-    language: 'French',
-    reviewer: 'admin',
-    publish_date: '05-10-2023',
-    updated_at: '25-09-2023',
-  },
-  {
-    id: '7',
-    title: 'Newsletter 7',
-    autor: 'autor 2',
-    state: NewsletterStatus.DISCARDED,
-    language: 'English',
-    reviewer: 'revisor 4',
-    publish_date: '06-10-2023',
-    updated_at: '24-09-2023',
-  },
-  {
-    id: '8',
-    title: 'Newsletter 8',
-    autor: 'autor 5',
-    state: NewsletterStatus.DRAFT,
-    language: 'Spanish',
-    reviewer: 'admin',
-    publish_date: null,
-    updated_at: '23-09-2023',
-  },
-  {
-    id: '9',
-    title: 'Newsletter 9',
-    autor: 'autor 3',
-    state: NewsletterStatus.IN_REVIEW,
-    language: 'French',
-    reviewer: 'revisor 4',
-    publish_date: '07-10-2023',
-    updated_at: '22-09-2023',
-  },
-  {
-    id: '10',
-    title: 'Newsletter 10',
-    autor: 'autor 1',
-    state: NewsletterStatus.APPROVED,
-    language: 'English',
-    reviewer: 'revisor 1',
-    publish_date: '08-10-2023',
-    updated_at: '21-09-2023',
-  },
-];
-
 export function NewslettersTable({ search, filter }: Props) {
-  const [data, setData] = useState<NewsletterRow[]>(mockNewsletters);
+  const [data, setData] = useState<NewsletterRow[]>([]);
+  //const [data, setData] = useState<NewsletterRow[]>([]);
   const [visibleCount, setVisibleCount] = useState(5);
   const [deleteId, setDeleteId] = useState<string | null>(null);
-
+  const navigate = useNavigate();
   const [orderBy, setOrderBy] = useState<keyof NewsletterRow>('updated_at');
   const [order, setOrder] = useState<'asc' | 'desc'>('desc');
 
@@ -192,6 +92,28 @@ export function NewslettersTable({ search, filter }: Props) {
 
     return value.toString().toLowerCase();
   };
+
+  useEffect(() => {
+    const loadNewsletters = async () => {
+      try {
+        const newsletters = await getAllNewsletters();
+        const rows: NewsletterRow[] = newsletters.map((n) => ({
+          id: n.id,
+          title: n.generationRequest?.topic || n.blocks?.[0]?.name || 'Sin título',
+          autor: n.creatorUserId,
+          state: n.state as NewsletterStatus,
+          language: 'Spanish',
+          reviewer: '—',
+          publish_date: null,
+          updated_at: new Date(n.updatedAt).toLocaleDateString(),
+        }));
+        setData(rows);
+      } catch (error) {
+        console.error('Error cargando newsletters:', error);
+      }
+    };
+    void loadNewsletters();
+  }, []);
 
   // FILTRO CENTRALIZADO
   const filteredData = useMemo(() => {
@@ -346,7 +268,7 @@ export function NewslettersTable({ search, filter }: Props) {
                       </IconButton>
                     </Tooltip>
                     <Tooltip title="Editar" arrow>
-                      <IconButton>
+                      <IconButton size="small" onClick={() => navigate(`/editarNewsletter/${n.id}`)}>
                         <EditIcon />
                       </IconButton>
                     </Tooltip>

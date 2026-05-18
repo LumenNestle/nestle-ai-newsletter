@@ -22,6 +22,7 @@ export const generateNewsletterBodySchema = z
       error: 'Area invalida.',
     }),
     templateId: requiredStringSchema,
+    brandKitId: requiredStringSchema,
     topic: requiredStringSchema,
     objective: requiredStringSchema,
     audience: requiredStringSchema,
@@ -47,8 +48,6 @@ export interface GeneratedNewsletterBlockDto {
 
 export interface GenerateNewsletterResponseDto {
   blocks: GeneratedNewsletterBlockDto[];
-  provider: 'gemini' | 'nestle';
-  model: string;
 }
 
 export type GenerateNewsletterRequestDto = z.infer<

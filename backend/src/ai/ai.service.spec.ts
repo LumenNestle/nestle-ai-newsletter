@@ -1,9 +1,6 @@
-import { BadRequestException, ServiceUnavailableException } from '@nestjs/common';
+import { ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AiService } from './ai.service';
-import { PrismaService } from '../prisma/prisma.service';
-import { SupabaseService } from '../supabase/supabase.service';
-import { UploadedAiFile } from './dto/upload-ai-asset.dto';
 
 type ConfigValues = Record<string, string | undefined>;
 
@@ -14,19 +11,8 @@ function createConfigService(values: ConfigValues): ConfigService {
 }
 
 function createService(values: ConfigValues = {}) {
-  const prisma = {
-    assets: {
-      create: jest.fn(),
-    },
-  } as unknown as PrismaService;
-  const supabaseService = {
-    uploadAsset: jest.fn(),
-  } as unknown as SupabaseService;
-
   return {
-    service: new AiService(createConfigService(values), prisma, supabaseService),
-    prisma,
-    supabaseService,
+    service: new AiService(createConfigService(values)),
   };
 }
 
@@ -38,7 +24,7 @@ describe('AiService', () => {
     jest.resetAllMocks();
   });
 
-  it('throws when no provider credentials are configured', async () => {
+  it('throws when Nestle GenIA credentials are not configured', async () => {
     const { service } = createService();
 
     await expect(
@@ -46,44 +32,13 @@ describe('AiService', () => {
     ).rejects.toBeInstanceOf(ServiceUnavailableException);
   });
 
-  it('improves text with Gemini by default when GEMINI_API_KEY exists', async () => {
+  it('improves text with Nestle GenIA', async () => {
     const { service } = createService({
-        GEMINI_API_KEY: 'test-key',
-        GEMINI_MODEL: 'gemini-2.5-flash-lite',
-      });
-
-    global.fetch = jest.fn().mockResolvedValue({
-      ok: true,
-      json: () =>
-        Promise.resolve({
-          candidates: [
-            {
-              content: {
-                parts: [{ text: 'Texto mejorado' }],
-              },
-            },
-          ],
-        }),
-    }) as typeof fetch;
-
-    await expect(
-      service.improveText({ text: 'Texto original' }),
-    ).resolves.toEqual({
-      originalText: 'Texto original',
-      improvedText: 'Texto mejorado',
-      provider: 'gemini',
-      model: 'gemini-2.5-flash-lite',
+      CLIENT_ID: 'client-id',
+      CLIENT_SECRET: 'client-secret',
+      NESTLE_GENIA_URL:
+        'https://eur-sdr-int-pub.nestle.com/api/dv-exp-sandbox-openai-api/1/genai/GCP/gemini-2.0-flash-001/generateContent',
     });
-  });
-
-  it('improves text with Nestle GenIA when AI_PROVIDER=nestle', async () => {
-    const { service } = createService({
-        AI_PROVIDER: 'nestle',
-        CLIENT_ID: 'client-id',
-        CLIENT_SECRET: 'client-secret',
-        NESTLE_GENIA_URL:
-          'https://eur-sdr-int-pub.nestle.com/api/dv-exp-sandbox-openai-api/1/genai/GCP/gemini-2.5-pro/generateContent',
-      });
 
     global.fetch = jest.fn().mockResolvedValue({
       ok: true,
@@ -104,15 +59,39 @@ describe('AiService', () => {
     ).resolves.toEqual({
       originalText: 'Texto original',
       improvedText: 'Texto mejorado por Nestle',
-      provider: 'nestle',
-      model: 'gemini-2.5-pro',
+    });
+
+    const fetchMock = global.fetch as jest.MockedFunction<typeof fetch>;
+    const [url, requestInit] = fetchMock.mock.calls[0] ?? [];
+    const fetchBody = JSON.parse((requestInit?.body as string | undefined) ?? '{}') as {
+      contents: Array<{ parts: Array<{ text: string }> }>;
+      generationConfig: { temperature: number; topP: number; topK: number; maxOutputTokens: number };
+    };
+
+    expect(url).toBe(
+      'https://eur-sdr-int-pub.nestle.com/api/dv-exp-sandbox-openai-api/1/genai/GCP/gemini-2.0-flash-001/generateContent',
+    );
+    expect(requestInit?.headers).toMatchObject({
+      client_id: 'client-id',
+      client_secret: 'client-secret',
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    });
+    expect(fetchBody.contents[0].parts[0].text).toContain('Text to improve:');
+    expect(fetchBody.generationConfig).toEqual({
+      temperature: 0.1,
+      topP: 0.8,
+      topK: 20,
+      maxOutputTokens: 4000,
     });
   });
 
-  it('generates newsletter blocks with structured context', async () => {
+  it('generates newsletter blocks with structured context through Nestle GenIA', async () => {
     const { service } = createService({
-      GEMINI_API_KEY: 'test-key',
-      GEMINI_MODEL: 'gemini-2.5-flash-lite',
+      CLIENT_ID: 'client-id',
+      CLIENT_SECRET: 'client-secret',
+      NESTLE_GENIA_URL:
+        'https://eur-sdr-int-pub.nestle.com/api/dv-exp-sandbox-openai-api/1/genai/GCP/gemini-2.0-flash-001/generateContent',
     });
 
     global.fetch = jest.fn().mockResolvedValue({
@@ -146,6 +125,7 @@ describe('AiService', () => {
       service.generateNewsletter({
         area: 'COMUNICACION_INTERNA',
         templateId: 'weekly-brief',
+        brandKitId: 'nestle-corporate',
         topic: 'Seguridad',
         objective: 'Informar avances',
         audience: 'Equipo interno',
@@ -163,34 +143,27 @@ describe('AiService', () => {
           backgroundColor: '#97CAEB',
         },
       ],
-      provider: 'gemini',
-      model: 'gemini-2.5-flash-lite',
     });
 
-    const fetchBody = JSON.parse(
-      (global.fetch as jest.Mock).mock.calls[0][1].body as string,
-    ) as {
+    const fetchMock = global.fetch as jest.MockedFunction<typeof fetch>;
+    const requestInit = fetchMock.mock.calls[0]?.[1];
+    const fetchBody = JSON.parse((requestInit?.body as string | undefined) ?? '{}') as {
       contents: Array<{ parts: Array<{ text: string }> }>;
+      generationConfig: { temperature: number; topP: number; topK: number; maxOutputTokens: number };
     };
 
     expect(fetchBody.contents[0].parts[0].text).toContain('"topic":"Seguridad"');
     expect(fetchBody.contents[0].parts[0].text).toContain(
       '"templateId":"weekly-brief"',
     );
-  });
-
-  it('rejects invalid asset files', async () => {
-    const { service } = createService();
-
-    await expect(
-      service.uploadAssets([
-        {
-          originalname: 'document.pdf',
-          mimetype: 'application/pdf',
-          size: 1200,
-          buffer: Buffer.from('fake'),
-        } as UploadedAiFile,
-      ]),
-    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(fetchBody.contents[0].parts[0].text).toContain(
+      '"brandKitId":"nestle-corporate"',
+    );
+    expect(fetchBody.generationConfig).toEqual({
+      temperature: 0.5,
+      topP: 0.8,
+      topK: 20,
+      maxOutputTokens: 4000,
+    });
   });
 });
