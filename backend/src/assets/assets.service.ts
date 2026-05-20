@@ -124,7 +124,7 @@ export class AssetsService {
       }
 
       const assets = await this.prisma.assets.findMany({
-        where: type ? { type } : { type: { not: asset_type.BLOCK } },
+        where: type ? { type } : { type: { not: asset_type.BLOCK as asset_type} },
         orderBy: [{ type: 'asc' }, { name: 'asc' }],
         select: {
           id: true,
